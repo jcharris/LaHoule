@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>LaHoule - Directional Sea State Laboratory</title>
+
+    <meta name="theme-color" content="#0f172a">
+    <link rel="stylesheet" href="css/seastate.css">
+
+    <!-- Three.js, OrbitControls & Plotly -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+</head>
+<body>
+
+    <!-- Left Controls Sidebar -->
+    <div id="sidebar">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+                <h1>🌊 Sea State Lab</h1>
+                <div class="subtitle">Directional Spectral Synthesis & Dispersion</div>
+                <div class="attribution">Jeffrey Harris (2026)</div>
+            </div>
+            <button id="btn-pause" class="btn-action" onclick="togglePause()">⏸ Pause</button>
+        </div>
+
+        <!-- Live Wave Metrics -->
+        <div class="dash-grid">
+            <div class="dash-card">
+                <div class="dash-title">Peak Wavelength &lambda;<sub>p</sub></div>
+                <div id="dash-lambda" class="dash-val" style="color: #38bdf8;">156.1 m</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-title">Peak Celerity c<sub>p</sub></div>
+                <div id="dash-cp" class="dash-val" style="color: #22c55e;">15.6 m/s</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-title">Probe &eta;(t)</div>
+                <div id="dash-eta" class="dash-val" style="color: #eab308;">+0.00 m</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-title">Steepness s<sub>p</sub></div>
+                <div id="dash-steep" class="dash-val" style="color: #f43f5e;">0.021</div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>Theoretical Benchmark:</strong><br>
+            • <strong>Dispersion:</strong> &omega;<sup>2</sup> = g k tanh(k d) (Finite Depth)<br>
+            • <strong>Spectrum:</strong> JONSWAP / Pierson–Moskowitz Synthesis<br>
+            • <strong>Spreading:</strong> D(&theta;) &prop; cos<sup>2s</sup>(&theta; - &theta;<sub>0</sub>)
+        </div>
+
+        <hr style="border-color: #334155;">
+
+        <!-- Spectrum Configuration -->
+        <div class="control-group">
+            <label>Wave Height H<sub>s</sub> (m) <span id="val-hs" class="value-badge">3.5 m</span></label>
+            <input type="range" id="slider-hs" min="0.5" max="10.0" step="0.2" value="3.5">
+        </div>
+
+        <div class="control-group">
+            <label>Peak Period T<sub>p</sub> (s) <span id="val-tp" class="value-badge">10.0 s</span></label>
+            <input type="range" id="slider-tp" min="4.0" max="22.0" step="0.5" value="10.0">
+        </div>
+
+        <div class="control-group">
+            <label>Peak Enhancement &gamma; <span id="val-gamma" class="value-badge">&gamma; = 3.3 (JONSWAP)</span></label>
+            <input type="range" id="slider-gamma" min="1.0" max="7.0" step="0.2" value="3.3">
+        </div>
+
+        <div class="control-group">
+            <label>Principal Direction &theta;<sub>0</sub> (deg) <span id="val-heading" class="value-badge">0° (Head)</span></label>
+            <input type="range" id="slider-heading" min="-180" max="180" step="5" value="0">
+        </div>
+
+        <div class="control-group">
+            <label>Directional Spreading (s) <span id="val-spread" class="value-badge">s = 4 (Swell)</span></label>
+            <input type="range" id="slider-spread" min="0" max="12" step="1" value="4">
+        </div>
+
+        <div class="control-group">
+            <label>Water Depth d (m) <span id="val-depth" class="value-badge">60 m</span></label>
+            <input type="range" id="slider-depth" min="8" max="200" step="2" value="60">
+        </div>
+
+        <div style="margin-top: 6px; font-size: 0.72rem; color: #94a3b8; line-height: 1.4;">
+            <strong>Teaching Insights:</strong><br>
+            • <strong>Spreading s = 0:</strong> Pure unidirectional wave tank condition.<br>
+            • <strong>Shallow Water:</strong> Drag depth down to 10 m to see the wavelength physically compress as &lambda; &approx; T &radic;(gd).<br>
+            • <strong>&gamma; = 1.0:</strong> Collapses to standard Pierson–Moskowitz fully developed sea.
+        </div>
+    </div>
+
+    <!-- Right 3D Viewport -->
+    <div id="viewport-container">
+        <div id="status-overlay">
+            Wave Probe: <span id="overlay-coords">(0, 0)</span><br>
+            Spectral Components: <span id="overlay-comps">48 Waves</span><br>
+            Dispersion Regime: <span id="overlay-regime" style="color: #38bdf8;">Deep Water</span>
+        </div>
+
+        <div id="canvas3d"></div>
+        <div id="plot-container"></div>
+    </div>
+
+    <script src="js/seastate_app.js"></script>
+</body>
+</html>

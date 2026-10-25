@@ -3,13 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>LaHoule - Interactive Marine Hydrodynamics & Offshore Suite</title>
+    <title>LaHoule - Interactive Marine Hydrodynamics & Offshore Engineering</title>
 
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
 
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
 
         body {
             background: #0f172a;
@@ -18,22 +24,27 @@
             min-height: 100dvh;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            padding: 32px 18px 48px;
+            justify-content: space-between;
+            padding: 24px 16px;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            width: 100%;
         }
 
         header {
-            max-width: 960px;
-            width: 100%;
             text-align: center;
-            margin-bottom: 36px;
+            margin-bottom: 32px;
+            padding-top: 12px;
         }
 
-        h1 {
-            font-size: 2.2rem;
+        .title {
+            font-size: 2.1rem;
+            font-weight: 800;
             color: #38bdf8;
-            letter-spacing: -0.5px;
-            margin-bottom: 6px;
+            letter-spacing: -0.02em;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -41,309 +52,190 @@
         }
 
         .tagline {
-            font-size: 1.05rem;
+            font-size: 1.0rem;
             color: #94a3b8;
-            max-width: 680px;
-            margin: 0 auto 10px;
-            line-height: 1.45;
+            margin-top: 6px;
         }
 
-        .author-badge {
-            display: inline-block;
-            background: rgba(56, 189, 248, 0.12);
-            color: #38bdf8;
-            border: 1px solid rgba(56, 189, 248, 0.3);
-            border-radius: 20px;
-            padding: 4px 14px;
+        .attribution {
             font-size: 0.8rem;
+            color: #0284c7;
             font-weight: 600;
+            margin-top: 4px;
         }
 
-        /* 3x2 Responsive Card Grid */
-        .grid-container {
-            max-width: 1100px;
-            width: 100%;
+        .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 22px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 36px;
         }
 
-        .card {
-            background: rgba(30, 41, 59, 0.7);
+        .module-card {
+            background: #1e293b;
             border: 1px solid #334155;
-            border-radius: 14px;
-            padding: 24px;
+            border-radius: 12px;
+            padding: 22px;
+            text-decoration: none;
+            color: inherit;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-            text-decoration: none;
-            color: inherit;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             overflow: hidden;
-            backdrop-filter: blur(8px);
         }
 
-        .card:hover {
+        .module-card:hover {
             transform: translateY(-4px);
             border-color: #38bdf8;
-            box-shadow: 0 12px 30px rgba(2, 132, 199, 0.2);
-        }
-
-        .card.disabled {
-            opacity: 0.55;
-            cursor: not-allowed;
-            pointer-events: none;
+            box-shadow: 0 12px 24px -10px rgba(56, 189, 248, 0.25);
+            background: #243248;
         }
 
         .card-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 14px;
+            align-items: center;
+            margin-bottom: 12px;
         }
 
-        .card-icon {
-            font-size: 2.2rem;
-            line-height: 1;
-        }
-
-        .status-badge {
-            font-size: 0.7rem;
+        .card-tag {
+            font-size: 0.68rem;
             font-weight: 700;
-            padding: 3px 8px;
-            border-radius: 12px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            letter-spacing: 0.05em;
         }
 
-        .status-live { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
-        .status-beta { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4); }
-        .status-soon { background: rgba(148, 163, 184, 0.2); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
+        .tag-ready { background: #064e3b; color: #34d399; border: 1px solid #059669; }
+        .tag-beta  { background: #78350f; color: #fbbf24; border: 1px solid #d97706; }
 
         .card-title {
             font-size: 1.25rem;
             font-weight: 700;
             color: #f8fafc;
             margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .card-desc {
-            font-size: 0.88rem;
+            font-size: 0.85rem;
             color: #cbd5e1;
-            line-height: 1.5;
-            margin-bottom: 20px;
+            line-height: 1.45;
+            margin-bottom: 16px;
             flex-grow: 1;
         }
 
-        .card-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-bottom: 18px;
-        }
-
-        .tag {
-            font-size: 0.72rem;
-            background: #090d16;
-            color: #94a3b8;
-            padding: 3px 8px;
-            border-radius: 4px;
-            border: 1px solid #1e293b;
-        }
-
         .card-footer {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 0.85rem;
+            font-size: 0.78rem;
             font-weight: 600;
             color: #38bdf8;
-            border-top: 1px solid rgba(51, 65, 85, 0.6);
-            padding-top: 14px;
-        }
-
-        .card-footer span {
             display: flex;
             align-items: center;
             gap: 4px;
         }
 
-        footer {
-            margin-top: auto;
-            padding-top: 48px;
-            text-align: center;
-            font-size: 0.78rem;
-            color: #64748b;
-            max-width: 700px;
-            line-height: 1.4;
+        .tech-note {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid #334155;
+            border-radius: 10px;
+            padding: 16px 20px;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            line-height: 1.5;
+            margin-bottom: 24px;
         }
 
-        footer a { color: #38bdf8; text-decoration: none; }
-        footer a:hover { text-decoration: underline; }
+        footer {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #64748b;
+            padding: 12px 0;
+            border-top: 1px solid #1e293b;
+        }
+
+        footer a { color: #94a3b8; text-decoration: none; }
+        footer a:hover { color: #38bdf8; }
 
         @media (max-width: 600px) {
-            h1 { font-size: 1.8rem; }
-            .tagline { font-size: 0.92rem; }
-            .grid-container { grid-template-columns: 1fr; }
+            .title { font-size: 1.7rem; }
+            body { padding: 16px 12px; }
         }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>🌊 LaHoule</h1>
-        <p class="tagline">An interactive, browser-native 3D demonstration suite for marine hydrodynamics, floating offshore renewable energy, and coastal wave engineering.</p>
-        <span class="author-badge">Jeffrey Harris (2026)</span>
-    </header>
+    <div class="container">
+        <header>
+            <div class="title">🌊 LaHoule</div>
+            <div class="tagline">Interactive Marine Hydrodynamics & Offshore Engineering Suite</div>
+            <div class="attribution">Jeffrey Harris (2026)</div>
+        </header>
 
-    <main class="grid-container">
-
-        <!-- 1. Ship Seakeeping & RAOs -->
-        <a href="ship.html" class="card">
-            <div>
-                <div class="card-header">
-                    <span class="card-icon">🚢</span>
-                    <span class="status-badge status-live">Live</span>
-                </div>
-                <div class="card-title">Ship Seakeeping & RAO Visualizer</div>
-                <div class="card-desc">
-                    Explore linear 2D strip theory, forward speed Doppler shift, 3-DOF coupled motion, and bow emergence / slamming risk on a standard Series 60 merchant hullform.
-                </div>
-                <div class="card-tags">
-                    <span class="tag">Series 60</span>
-                    <span class="tag">Strip Theory</span>
-                    <span class="tag">Doppler Effect</span>
-                    <span class="tag">RAO Curves</span>
-                </div>
-            </div>
-            <div class="card-footer">
-                <span>Launch Visualizer</span>
-                <span>→</span>
-            </div>
-        </a>
-
-        <!-- 2. FOWT Spar Buoy Simulator -->
-        <a href="fowt.html" class="card">
-            <div>
-                <div class="card-header">
-                    <span class="card-icon">💨</span>
-                    <span class="status-badge status-beta">Beta</span>
-                </div>
-                <div class="card-title">Floating Wind: Spar Buoy</div>
-                <div class="card-desc">
-                    NREL 5 MW turbine on an OC3-Hywind spar foundation. Real-time coupled aero-hydro-servo solver featuring blade pitch control, catenary mooring, and wake expansion.
-                </div>
-                <div class="card-tags">
-                    <span class="tag">NREL 5MW</span>
-                    <span class="tag">OC3 Spar</span>
-                    <span class="tag">Pitch-Servo Instability</span>
-                    <span class="tag">Catenary</span>
-                </div>
-            </div>
-            <div class="card-footer">
-                <span>Launch Simulator</span>
-                <span>→</span>
-            </div>
-        </a>
-
-        <!-- 3. FOWT Semi-Submersible (Upcoming) -->
-        <div class="card disabled">
-            <div>
-                <div class="card-header">
-                    <span class="card-icon">⚓</span>
-                    <span class="status-badge status-soon">Planned</span>
-                </div>
-                <div class="card-title">Floating Wind: Semi-Submersible</div>
-                <div class="card-desc">
-                    OC4-DeepCwind 3-column floating semi-sub platform. Demonstrates high waterplane restoration stiffness and multi-column wave phase cancellation in shallow water depths.
-                </div>
-                <div class="card-tags">
-                    <span class="tag">OC4-DeepCwind</span>
-                    <span class="tag">Phase Cancellation</span>
-                    <span class="tag">Shallow Water</span>
-                </div>
-            </div>
-            <div class="card-footer">
-                <span>Coming Soon</span>
-                <span>•</span>
-            </div>
+        <div class="tech-note">
+            <strong>About the Suite:</strong> A zero-install, browser-based collection of interactive simulators designed for university instruction and engineering intuition. Powered by client-side WebGL (Three.js), real-time Plotly diagnostics, and physics-informed reduced-order numerical solvers running at 60 FPS on laptops and mobile devices.
         </div>
 
-        <!-- 4. Ocean Wave Laboratory (Upcoming) -->
-        <div class="card disabled">
-            <div>
-                <div class="card-header">
-                    <span class="card-icon">🌊</span>
-                    <span class="status-badge status-soon">Planned</span>
+        <div class="grid">
+            <!-- Module 01: Directional Sea State Lab -->
+            <a href="seastate.html" class="module-card">
+                <div>
+                    <div class="card-header">
+                        <span class="card-tag tag-ready">Module 01</span>
+                    </div>
+                    <div class="card-title">🌊 Sea State Lab</div>
+                    <div class="card-desc">
+                        Directional wave spectral synthesis (JONSWAP / Pierson–Moskowitz), finite-depth dispersion solver ($\omega^2 = gk\tanh kd$), cosine spreading, and virtual waverider buoy telemetry.
+                    </div>
                 </div>
-                <div class="card-title">Directional Sea State Laboratory</div>
-                <div class="card-desc">
-                    Pure wave mechanics testbed. Compare linear Airy, Stokes 2nd-order, and JONSWAP / Pierson-Moskowitz spectra with directional cosine spreading.
+                <div class="card-footer">
+                    Launch Simulator <span>&rarr;</span>
                 </div>
-                <div class="card-tags">
-                    <span class="tag">JONSWAP</span>
-                    <span class="tag">Stokes Waves</span>
-                    <span class="tag">Directional Spreading</span>
-                </div>
-            </div>
-            <div class="card-footer">
-                <span>Coming Soon</span>
-                <span>•</span>
-            </div>
-        </div>
+            </a>
 
-        <!-- 5. Wave Energy Converter (Upcoming) -->
-        <div class="card disabled">
-            <div>
-                <div class="card-header">
-                    <span class="card-icon">⚡</span>
-                    <span class="status-badge status-soon">Planned</span>
+            <!-- Module 02: Vessel Seakeeping -->
+            <a href="ship.html" class="module-card">
+                <div>
+                    <div class="card-header">
+                        <span class="card-tag tag-ready">Module 02</span>
+                    </div>
+                    <div class="card-title">🚢 Vessel Seakeeping</div>
+                    <div class="card-desc">
+                        6-DOF rigid-body ship dynamics, wave frequency encounter effects, Response Amplitude Operators (RAO), heading angles, and phase-resolved orbital particle motion.
+                    </div>
                 </div>
-                <div class="card-title">Wave Energy: Point Absorber</div>
-                <div class="card-desc">
-                    Heaving point absorber with Power Take-Off (PTO) damping tuning. Demonstrates resonance impedance matching and the theoretical Budal upper limit.
+                <div class="card-footer">
+                    Launch Simulator <span>&rarr;</span>
                 </div>
-                <div class="card-tags">
-                    <span class="tag">WEC</span>
-                    <span class="tag">Point Absorber</span>
-                    <span class="tag">PTO Impedance</span>
-                </div>
-            </div>
-            <div class="card-footer">
-                <span>Coming Soon</span>
-                <span>•</span>
-            </div>
-        </div>
+            </a>
 
-        <!-- 6. Coastal Shoaling & Refraction (Upcoming) -->
-        <div class="card disabled">
-            <div>
-                <div class="card-header">
-                    <span class="card-icon">🏖️</span>
-                    <span class="status-badge status-soon">Planned</span>
+            <!-- Module 03: Floating Offshore Wind (FOWT) -->
+            <a href="fowt.html" class="module-card">
+                <div>
+                    <div class="card-header">
+                        <span class="card-tag tag-beta">Module 03 &bull; Beta</span>
+                    </div>
+                    <div class="card-title">💨 FOWT Dynamics</div>
+                    <div class="card-desc">
+                        NREL 5 MW / OC3-Hywind spar benchmark. Coupled surge-pitch-tower bending ODEs, gain-scheduled pitch controller, negative aerodynamic damping, catenary mooring, and expanding helical wake.
+                    </div>
                 </div>
-                <div class="card-title">Coastal Shoaling & Refraction</div>
-                <div class="card-desc">
-                    Nearshore bathymetry wave transformation. Interactive wave compression, Snell's law shoreline refraction, and Miche/Battjes-Janssen wave breaking limits.
+                <div class="card-footer">
+                    Launch Simulator <span>&rarr;</span>
                 </div>
-                <div class="card-tags">
-                    <span class="tag">Shoaling Ks</span>
-                    <span class="tag">Snell Refraction</span>
-                    <span class="tag">Surf Zone</span>
-                </div>
-            </div>
-            <div class="card-footer">
-                <span>Coming Soon</span>
-                <span>•</span>
-            </div>
+            </a>
         </div>
-
-    </main>
+    </div>
 
     <footer>
-        <p><strong>Disclaimer:</strong> Developed purely as a browser demonstration suite for academic teaching and theory exploration. Not certified for commercial operations, navigation, or safety-critical engineering design.</p>
-        <p style="margin-top: 8px;">For suggestions or collaborations, open an issue on <a href="https://github.com/jcharris/LaHoule">GitHub</a>.</p>
+        <div class="container">
+            Open-source educational engineering suite &bull; Built with Three.js &amp; Plotly &bull; 
+            <a href="https://github.com/jcharris/LaHoule" target="_blank" rel="noopener">GitHub Repository</a>
+        </div>
     </footer>
 
 </body>
