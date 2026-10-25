@@ -47,11 +47,55 @@ h1 { font-size: 1.25rem; color: #38bdf8; display: flex; align-items: center; gap
 }
 .btn-action:hover { background: #38bdf8; color: #0f172a; }
 
-.control-group { display: flex; flex-direction: column; gap: 2px; }
-label { font-size: 0.78rem; font-weight: 600; color: #f8fafc; display: flex; justify-content: space-between; }
-input[type="range"] { accent-color: #38bdf8; cursor: pointer; height: 24px; touch-action: manipulate; }
+.control-group { display: flex; flex-direction: column; gap: 4px; }
 
-.value-badge { color: #38bdf8; font-family: monospace; font-weight: bold; }
+label { 
+    font-size: 0.78rem; 
+    font-weight: 600; 
+    color: #f8fafc; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: baseline;
+    text-transform: none;
+}
+
+.label-text {
+    display: inline-block;
+    color: #f8fafc;
+}
+
+/* Explicit mathematical notation formatting */
+label sub, .dash-title sub {
+    font-size: 0.75em;
+    vertical-align: sub;
+    line-height: 0;
+    font-weight: normal;
+}
+
+label sup, .info-box sup {
+    font-size: 0.75em;
+    vertical-align: super;
+    line-height: 0;
+}
+
+label i {
+    font-style: italic;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 0.9em;
+}
+
+input[type="range"] { 
+    accent-color: #38bdf8; 
+    cursor: pointer; 
+    height: 24px; 
+    touch-action: manipulate; 
+}
+
+.value-badge { 
+    color: #38bdf8; 
+    font-family: monospace; 
+    font-weight: bold; 
+}
 
 .dash-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .dash-card {
@@ -61,7 +105,7 @@ input[type="range"] { accent-color: #38bdf8; cursor: pointer; height: 24px; touc
     padding: 6px 4px;
     text-align: center;
 }
-.dash-title { font-size: 0.55rem; color: #94a3b8; text-transform: uppercase; }
+.dash-title { font-size: 0.58rem; color: #94a3b8; text-transform: uppercase; }
 .dash-val { font-size: 0.82rem; font-weight: bold; font-family: monospace; margin-top: 2px; }
 
 .info-box {

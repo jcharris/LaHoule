@@ -53,36 +53,54 @@
             • <strong>Spreading:</strong> D(&theta;) &prop; cos<sup>2s</sup>(&theta; - &theta;<sub>0</sub>)
         </div>
 
-        <hr style="border-color: #334155;">
+        <hr style="border-color: #334155; border-style: solid; border-width: 1px 0 0 0;">
 
         <!-- Spectrum Configuration -->
         <div class="control-group">
-            <label>Wave Height H<sub>s</sub> (m) <span id="val-hs" class="value-badge">3.5 m</span></label>
+            <label>
+                <span class="label-text">Wave Height <i>H</i><sub>s</sub> (m)</span>
+                <span id="val-hs" class="value-badge">3.5 m</span>
+            </label>
             <input type="range" id="slider-hs" min="0.5" max="10.0" step="0.2" value="3.5">
         </div>
 
         <div class="control-group">
-            <label>Peak Period T<sub>p</sub> (s) <span id="val-tp" class="value-badge">10.0 s</span></label>
+            <label>
+                <span class="label-text">Peak Period <i>T</i><sub>p</sub> (s)</span>
+                <span id="val-tp" class="value-badge">10.0 s</span>
+            </label>
             <input type="range" id="slider-tp" min="4.0" max="22.0" step="0.5" value="10.0">
         </div>
 
         <div class="control-group">
-            <label>Peak Enhancement &gamma; <span id="val-gamma" class="value-badge">&gamma; = 3.3 (JONSWAP)</span></label>
+            <label>
+                <span class="label-text">Peak Enhancement &gamma;</span>
+                <span id="val-gamma" class="value-badge">&gamma; = 3.3 (JONSWAP)</span>
+            </label>
             <input type="range" id="slider-gamma" min="1.0" max="7.0" step="0.2" value="3.3">
         </div>
 
         <div class="control-group">
-            <label>Principal Direction &theta;<sub>0</sub> (deg) <span id="val-heading" class="value-badge">0° (Head)</span></label>
+            <label>
+                <span class="label-text">Principal Direction &theta;<sub>0</sub> (deg)</span>
+                <span id="val-heading" class="value-badge">0° (Head)</span>
+            </label>
             <input type="range" id="slider-heading" min="-180" max="180" step="5" value="0">
         </div>
 
         <div class="control-group">
-            <label>Directional Spreading (s) <span id="val-spread" class="value-badge">s = 4 (Swell)</span></label>
+            <label>
+                <span class="label-text">Directional Spreading (s)</span>
+                <span id="val-spread" class="value-badge">s = 4 (Swell)</span>
+            </label>
             <input type="range" id="slider-spread" min="0" max="12" step="1" value="4">
         </div>
 
         <div class="control-group">
-            <label>Water Depth d (m) <span id="val-depth" class="value-badge">60 m</span></label>
+            <label>
+                <span class="label-text">Water Depth d (m)</span>
+                <span id="val-depth" class="value-badge">60 m</span>
+            </label>
             <input type="range" id="slider-depth" min="8" max="200" step="2" value="60">
         </div>
 
@@ -98,7 +116,7 @@
     <div id="viewport-container">
         <div id="status-overlay">
             Wave Probe: <span id="overlay-coords">(0, 0)</span><br>
-            Spectral Components: <span id="overlay-comps">48 Waves</span><br>
+            Spectral Components: <span id="overlay-comps">32 Waves</span><br>
             Dispersion Regime: <span id="overlay-regime" style="color: #38bdf8;">Deep Water</span>
         </div>
 
