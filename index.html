@@ -3,942 +3,348 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>LaHoule 3D - Seakeeping & RAO Visualizer</title>
+    <title>LaHoule - Interactive Marine Hydrodynamics & Offshore Suite</title>
 
-    <!-- Mobile PWA Meta Tags -->
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-    <!-- Three.js, OrbitControls & Plotly -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
 
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
-        
-        html { height: -webkit-fill-available; }
-        body { 
-            height: 100vh; 
-            height: -webkit-fill-available; 
-            height: 100dvh; 
-            background: #0f172a; 
-            color: #f8fafc; 
-            overflow: hidden; 
-            display: flex; 
-            flex-direction: row; 
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
 
-        /* Left Control Sidebar */
-        #sidebar {
-            width: 370px;
-            background: rgba(30, 41, 59, 0.95);
-            padding: 18px;
+        body {
+            background: #0f172a;
+            color: #f8fafc;
+            min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            border-right: 1px solid #334155;
-            z-index: 20;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-            backdrop-filter: blur(8px);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            align-items: center;
+            padding: 32px 18px 48px;
         }
 
-        h1 { font-size: 1.25rem; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
-        .subtitle { font-size: 0.75rem; color: #94a3b8; margin-top: -6px; margin-bottom: 2px; }
-        .attribution { font-size: 0.75rem; color: #38bdf8; font-weight: 600; margin-top: -2px; }
-
-        .control-group { display: flex; flex-direction: column; gap: 3px; }
-        label { font-size: 0.80rem; font-weight: 600; color: #f8fafc; display: flex; justify-content: space-between; }
-        input[type="range"] { accent-color: #38bdf8; cursor: pointer; height: 26px; }
-
-        .value-badge { color: #38bdf8; font-family: monospace; font-weight: bold; }
-
-        /* Dashboard Cards */
-        .dash-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
-        .dash-card {
-            background: #0f172a;
-            border: 1px solid #334155;
-            border-radius: 6px;
-            padding: 6px 4px;
+        header {
+            max-width: 960px;
+            width: 100%;
             text-align: center;
+            margin-bottom: 36px;
         }
-        .dash-title { font-size: 0.58rem; color: #94a3b8; text-transform: uppercase; }
-        .dash-val { font-size: 0.85rem; font-weight: bold; font-family: monospace; margin-top: 2px; }
 
-        /* Severity Colors */
-        .val-green { color: #22c55e !important; }
-        .val-yellow { color: #eab308 !important; }
-        .val-red { color: #ef4444 !important; }
-
-        /* Vessel Specs Box */
-        .vessel-box {
-            background: #0f172a;
-            border: 1px solid #334155;
-            border-radius: 6px;
-            padding: 8px 12px;
-            font-size: 0.75rem;
-            color: #cbd5e1;
-            line-height: 1.4;
-        }
-        .vessel-box strong { color: #f8fafc; }
-
-        /* Academic Disclaimer Box */
-        .disclaimer-box {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.4);
-            border-radius: 6px;
-            padding: 8px 10px;
-            font-size: 0.70rem;
-            color: #fca5a5;
-            line-height: 1.35;
-        }
-        .disclaimer-box strong { color: #f87171; }
-
-        /* Toggle Button Group */
-        .toggle-group { display: flex; gap: 4px; margin-bottom: 2px; }
-        .btn-toggle {
-            flex: 1;
-            padding: 6px;
-            background: #0f172a;
-            border: 1px solid #334155;
-            color: #94a3b8;
-            border-radius: 4px;
-            font-size: 0.70rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .btn-toggle.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; }
-
-        /* Right Viewport Container */
-        #viewport-container { flex: 1; display: flex; flex-direction: column; position: relative; }
-        #canvas3d { flex: 1; width: 100%; height: 100%; display: block; touch-action: none; }
-        #plot-container { height: 260px; background: #0f172a; border-top: 1px solid #334155; transition: transform 0.3s ease; }
-
-        #status-overlay {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            background: rgba(30, 41, 59, 0.85);
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 0.75rem;
+        h1 {
+            font-size: 2.2rem;
             color: #38bdf8;
-            border: 1px solid #334155;
-            backdrop-filter: blur(4px);
-            pointer-events: none;
-            z-index: 5;
-        }
-
-        /* First-Time Academic Notice Modal */
-        #disclaimer-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(6px);
+            letter-spacing: -0.5px;
+            margin-bottom: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 100;
-            padding: 20px;
-        }
-
-        .modal-content {
-            background: #1e293b;
-            border: 1px solid #38bdf8;
-            border-radius: 12px;
-            max-width: 500px;
-            padding: 24px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-        }
-
-        .modal-title { font-size: 1.05rem; color: #38bdf8; font-weight: bold; margin-bottom: 12px; }
-        .modal-body { font-size: 0.82rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 20px; }
-        .btn-modal {
-            width: 100%;
-            padding: 10px;
-            background: #0284c7;
-            color: #ffffff;
-            border: none;
-            border-radius: 6px;
-            font-weight: bold;
-            font-size: 0.90rem;
-            cursor: pointer;
-        }
-
-        /* Mobile Action Buttons */
-        .mobile-fab-container {
-            display: none;
-            position: absolute;
-            bottom: 16px;
-            left: 50%;
-            transform: translateX(-50%);
             gap: 10px;
-            z-index: 30;
         }
 
-        .btn-fab {
-            padding: 10px 16px;
-            background: #0284c7;
-            color: #ffffff;
-            border: 1px solid #38bdf8;
+        .tagline {
+            font-size: 1.05rem;
+            color: #94a3b8;
+            max-width: 680px;
+            margin: 0 auto 10px;
+            line-height: 1.45;
+        }
+
+        .author-badge {
+            display: inline-block;
+            background: rgba(56, 189, 248, 0.12);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.3);
             border-radius: 20px;
-            font-size: 0.80rem;
-            font-weight: bold;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-            cursor: pointer;
-            backdrop-filter: blur(4px);
+            padding: 4px 14px;
+            font-size: 0.8rem;
+            font-weight: 600;
         }
 
-        .drawer-close-btn {
-            display: none;
-            align-self: flex-end;
-            background: #334155;
+        /* 3x2 Responsive Card Grid */
+        .grid-container {
+            max-width: 1100px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 22px;
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid #334155;
+            border-radius: 14px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            text-decoration: none;
+            color: inherit;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(8px);
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: #38bdf8;
+            box-shadow: 0 12px 30px rgba(2, 132, 199, 0.2);
+        }
+
+        .card.disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 14px;
+        }
+
+        .card-icon {
+            font-size: 2.2rem;
+            line-height: 1;
+        }
+
+        .status-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-live { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+        .status-beta { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4); }
+        .status-soon { background: rgba(148, 163, 184, 0.2); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
             color: #f8fafc;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            cursor: pointer;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
 
-        /* MOBILE RESPONSIVE OVERRIDES (<= 900px) */
-        @media (max-width: 900px) {
-            body { flex-direction: column; overflow: hidden; }
-            #viewport-container { width: 100vw; height: 100%; flex: 1; }
-            .mobile-fab-container { display: flex; }
+        .card-desc {
+            font-size: 0.88rem;
+            color: #cbd5e1;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            flex-grow: 1;
+        }
 
-            #sidebar {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                width: 100vw;
-                max-height: 80dvh;
-                border-right: none;
-                border-top: 2px solid #38bdf8;
-                border-radius: 16px 16px 0 0;
-                transform: translateY(100%);
-                box-shadow: 0 -10px 25px rgba(0,0,0,0.6);
-            }
+        .card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 18px;
+        }
 
-            #sidebar.drawer-open { transform: translateY(0%); }
-            .drawer-close-btn { display: block; }
+        .tag {
+            font-size: 0.72rem;
+            background: #090d16;
+            color: #94a3b8;
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid #1e293b;
+        }
 
-            #plot-container {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                width: 100vw;
-                height: 55dvh;
-                z-index: 25;
-                border-top: 2px solid #38bdf8;
-                border-radius: 16px 16px 0 0;
-                transform: translateY(100%);
-                box-shadow: 0 -10px 25px rgba(0,0,0,0.6);
-            }
+        .card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #38bdf8;
+            border-top: 1px solid rgba(51, 65, 85, 0.6);
+            padding-top: 14px;
+        }
 
-            #plot-container.drawer-open { transform: translateY(0%); }
-            #status-overlay { font-size: 0.68rem; padding: 5px 8px; top: 8px; right: 8px; }
+        .card-footer span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        footer {
+            margin-top: auto;
+            padding-top: 48px;
+            text-align: center;
+            font-size: 0.78rem;
+            color: #64748b;
+            max-width: 700px;
+            line-height: 1.4;
+        }
+
+        footer a { color: #38bdf8; text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 1.8rem; }
+            .tagline { font-size: 0.92rem; }
+            .grid-container { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
 
-    <!-- Academic Demonstration Notice Modal -->
-    <div id="disclaimer-modal">
-        <div class="modal-content">
-            <div class="modal-title">⚠️ DEMONSTRATION NOTICE</div>
-            <div class="modal-body">
-                This web application (<strong>LaHoule 3D</strong>) is an interactive demonstration tool developed strictly for teaching marine hydrodynamics.
-                <br><br>
-                It uses 2D linear strip theory and empirical damping models. <strong>It is NOT certified for vessel design, commercial operations, navigation, or safety-critical engineering.</strong> The author assumes no liability for real-world application or reliance on its outputs.
+    <header>
+        <h1>🌊 LaHoule</h1>
+        <p class="tagline">An interactive, browser-native 3D demonstration suite for marine hydrodynamics, floating offshore renewable energy, and coastal wave engineering.</p>
+        <span class="author-badge">Jeffrey Harris (2026)</span>
+    </header>
+
+    <main class="grid-container">
+
+        <!-- 1. Ship Seakeeping & RAOs -->
+        <a href="ship.html" class="card">
+            <div>
+                <div class="card-header">
+                    <span class="card-icon">🚢</span>
+                    <span class="status-badge status-live">Live</span>
+                </div>
+                <div class="card-title">Ship Seakeeping & RAO Visualizer</div>
+                <div class="card-desc">
+                    Explore linear 2D strip theory, forward speed Doppler shift, 3-DOF coupled motion, and bow emergence / slamming risk on a standard Series 60 merchant hullform.
+                </div>
+                <div class="card-tags">
+                    <span class="tag">Series 60</span>
+                    <span class="tag">Strip Theory</span>
+                    <span class="tag">Doppler Effect</span>
+                    <span class="tag">RAO Curves</span>
+                </div>
             </div>
-            <button class="btn-modal" onclick="acceptDisclaimer()">I UNDERSTAND & AGREE</button>
-        </div>
-    </div>
-
-    <!-- Left Controls / Mobile Slide-Up Drawer -->
-    <div id="sidebar">
-        <button class="drawer-close-btn" onclick="closeDrawers()">✕ Close Panel</button>
-        
-        <div>
-            <h1>🌊 LaHoule 3D</h1>
-            <div class="subtitle">Seakeeping & Strip Theory RAO Visualizer</div>
-            <div class="attribution">Jeffrey Harris (2026)</div>
-        </div>
-
-        <!-- Real-Time Motion Dashboard -->
-        <div class="dash-grid">
-            <div class="dash-card">
-                <div class="dash-title">Heave (|&xi;₃|)</div>
-                <div id="dash-heave" class="dash-val val-green">-- m</div>
+            <div class="card-footer">
+                <span>Launch Visualizer</span>
+                <span>→</span>
             </div>
-            <div class="dash-card">
-                <div class="dash-title">Roll (|&xi;₄|)</div>
-                <div id="dash-roll" class="dash-val val-green">--&deg;</div>
+        </a>
+
+        <!-- 2. FOWT Spar Buoy Simulator -->
+        <a href="fowt.html" class="card">
+            <div>
+                <div class="card-header">
+                    <span class="card-icon">💨</span>
+                    <span class="status-badge status-beta">Beta</span>
+                </div>
+                <div class="card-title">Floating Wind: Spar Buoy</div>
+                <div class="card-desc">
+                    NREL 5 MW turbine on an OC3-Hywind spar foundation. Real-time coupled aero-hydro-servo solver featuring blade pitch control, catenary mooring, and wake expansion.
+                </div>
+                <div class="card-tags">
+                    <span class="tag">NREL 5MW</span>
+                    <span class="tag">OC3 Spar</span>
+                    <span class="tag">Pitch-Servo Instability</span>
+                    <span class="tag">Catenary</span>
+                </div>
             </div>
-            <div class="dash-card">
-                <div class="dash-title">Pitch (|&xi;₅|)</div>
-                <div id="dash-pitch" class="dash-val val-green">--&deg;</div>
+            <div class="card-footer">
+                <span>Launch Simulator</span>
+                <span>→</span>
             </div>
-            <div class="dash-card">
-                <div class="dash-title">Enc Freq (&omega;<sub>e</sub>)</div>
-                <div id="dash-omegae" class="dash-val" style="color: #38bdf8;">-- rad/s</div>
+        </a>
+
+        <!-- 3. FOWT Semi-Submersible (Upcoming) -->
+        <div class="card disabled">
+            <div>
+                <div class="card-header">
+                    <span class="card-icon">⚓</span>
+                    <span class="status-badge status-soon">Planned</span>
+                </div>
+                <div class="card-title">Floating Wind: Semi-Submersible</div>
+                <div class="card-desc">
+                    OC4-DeepCwind 3-column floating semi-sub platform. Demonstrates high waterplane restoration stiffness and multi-column wave phase cancellation in shallow water depths.
+                </div>
+                <div class="card-tags">
+                    <span class="tag">OC4-DeepCwind</span>
+                    <span class="tag">Phase Cancellation</span>
+                    <span class="tag">Shallow Water</span>
+                </div>
             </div>
-        </div>
-
-        <!-- Fixed Vessel Characteristics Card -->
-        <div class="vessel-box">
-            <strong>Vessel Characteristics (Parent Form):</strong><br>
-            &bull; <strong>Hullform:</strong> Series 60 (C<sub>B</sub> = 0.60 Merchant Form)<br>
-            &bull; <strong>Length (L<sub>pp</sub>):</strong> 100.0 m &nbsp;|&nbsp; <strong>Beam (B):</strong> 13.33 m (L/B = 7.50)<br>
-            &bull; <strong>Draft (T):</strong> 5.33 m (B/T = 2.50) &nbsp;|&nbsp; <strong>Displacement:</strong> 4,368 tonnes
-        </div>
-
-        <!-- Academic Disclaimer Box -->
-        <div class="disclaimer-box">
-            <strong>⚠️ Academic Disclaimer:</strong> For educational demonstration only. Not for navigation, vessel design, or operational safety decisions.
-        </div>
-
-        <hr style="border-color: #334155;">
-
-        <!-- UI Sliders -->
-        <div class="control-group">
-            <label>Wave Period T (s) <span id="val-period" class="value-badge">9.0 s</span></label>
-            <input type="range" id="slider-period" min="4.0" max="18.0" step="0.2" value="9.0">
-        </div>
-
-        <div class="control-group">
-            <label>Wave Amplitude A (m) <span id="val-amp" class="value-badge">1.5 m</span></label>
-            <input type="range" id="slider-amp" min="0.2" max="4.0" step="0.1" value="1.5">
-        </div>
-
-        <div class="control-group">
-            <label>Heading Angle &beta; (deg) <span id="val-beta" class="value-badge">135&deg;</span></label>
-            <input type="range" id="slider-beta" min="0" max="180" step="15" value="135">
-        </div>
-
-        <div class="control-group">
-            <label>Ship Speed U (m/s) <span id="val-speed" class="value-badge">6.0 m/s (11.7 kts)</span></label>
-            <input type="range" id="slider-speed" min="0.0" max="12.0" step="0.5" value="6.0">
-        </div>
-
-        <div class="control-group">
-            <label>Water Depth d (m) <span id="val-depth" class="value-badge">100 m</span></label>
-            <input type="range" id="slider-depth" min="15" max="300" step="5" value="100">
-        </div>
-
-        <hr style="border-color: #334155;">
-
-        <!-- Plot & Water Style Toggles -->
-        <div>
-            <label style="margin-bottom: 3px;">3D Water Surface Mode:</label>
-            <div class="toggle-group">
-                <button id="btn-water-color" class="btn-toggle active" onclick="setWaterMode('color')">🎨 False-Color Map</button>
-                <button id="btn-water-shaded" class="btn-toggle" onclick="setWaterMode('shaded')">🌊 Specular Water</button>
+            <div class="card-footer">
+                <span>Coming Soon</span>
+                <span>•</span>
             </div>
         </div>
 
-        <div>
-            <label style="margin-bottom: 3px;">RAO Plot Axis:</label>
-            <div class="toggle-group">
-                <button id="btn-period" class="btn-toggle active" onclick="setPlotMode('period')">Period T (s)</button>
-                <button id="btn-omega" class="btn-toggle" onclick="setPlotMode('omega')">Freq &omega; (rad/s)</button>
-                <button id="btn-hz" class="btn-toggle" onclick="setPlotMode('hz')">Freq f (Hz)</button>
+        <!-- 4. Ocean Wave Laboratory (Upcoming) -->
+        <div class="card disabled">
+            <div>
+                <div class="card-header">
+                    <span class="card-icon">🌊</span>
+                    <span class="status-badge status-soon">Planned</span>
+                </div>
+                <div class="card-title">Directional Sea State Laboratory</div>
+                <div class="card-desc">
+                    Pure wave mechanics testbed. Compare linear Airy, Stokes 2nd-order, and JONSWAP / Pierson-Moskowitz spectra with directional cosine spreading.
+                </div>
+                <div class="card-tags">
+                    <span class="tag">JONSWAP</span>
+                    <span class="tag">Stokes Waves</span>
+                    <span class="tag">Directional Spreading</span>
+                </div>
+            </div>
+            <div class="card-footer">
+                <span>Coming Soon</span>
+                <span>•</span>
             </div>
         </div>
 
-        <div style="font-size: 0.74rem; color: #cbd5e1; line-height: 1.35;">
-            <strong>Demonstration Notes:</strong><br>
-            &bull; <strong>Seabed Depth:</strong> Dark seabed plane tracks water depth slider <em>d</em>.<br>
-            &bull; <strong>Slamming Risk:</strong> Calculated from bow emergence relative motion.<br>
-            &bull; <strong>Color Codes:</strong> <span style="color:#22c55e;">Green</span> (Safe), <span style="color:#eab308;">Yellow</span> (Caution), <span style="color:#ef4444;">Red</span> (Hazardous).
-        </div>
-    </div>
-
-    <!-- Right 3D Viewport & Mobile Floating Buttons -->
-    <div id="viewport-container">
-        <div id="status-overlay">
-            &omega;<sub>e</sub> = <span id="overlay-omegae">-- rad/s</span> (T<sub>e</sub> = <span id="overlay-te">-- s</span>)<br>
-            Bow Slamming: <span id="overlay-slam" style="font-weight: bold; color: #22c55e;">LOW</span><br>
-            Solve Time: <span id="solve-time">0.8 ms</span>
-        </div>
-
-        <!-- 3D WebGL Canvas -->
-        <div id="canvas3d"></div>
-
-        <!-- Mobile Floating Action Buttons (FABs) -->
-        <div class="mobile-fab-container">
-            <button class="btn-fab" onclick="toggleDrawer('sidebar')">⚙️ Controls</button>
-            <button class="btn-fab" onclick="toggleDrawer('plot-container')">📈 RAO Curves</button>
+        <!-- 5. Wave Energy Converter (Upcoming) -->
+        <div class="card disabled">
+            <div>
+                <div class="card-header">
+                    <span class="card-icon">⚡</span>
+                    <span class="status-badge status-soon">Planned</span>
+                </div>
+                <div class="card-title">Wave Energy: Point Absorber</div>
+                <div class="card-desc">
+                    Heaving point absorber with Power Take-Off (PTO) damping tuning. Demonstrates resonance impedance matching and the theoretical Budal upper limit.
+                </div>
+                <div class="card-tags">
+                    <span class="tag">WEC</span>
+                    <span class="tag">Point Absorber</span>
+                    <span class="tag">PTO Impedance</span>
+                </div>
+            </div>
+            <div class="card-footer">
+                <span>Coming Soon</span>
+                <span>•</span>
+            </div>
         </div>
 
-        <!-- Plotly Spectrum Panel -->
-        <div id="plot-container"></div>
-    </div>
+        <!-- 6. Coastal Shoaling & Refraction (Upcoming) -->
+        <div class="card disabled">
+            <div>
+                <div class="card-header">
+                    <span class="card-icon">🏖️</span>
+                    <span class="status-badge status-soon">Planned</span>
+                </div>
+                <div class="card-title">Coastal Shoaling & Refraction</div>
+                <div class="card-desc">
+                    Nearshore bathymetry wave transformation. Interactive wave compression, Snell's law shoreline refraction, and Miche/Battjes-Janssen wave breaking limits.
+                </div>
+                <div class="card-tags">
+                    <span class="tag">Shoaling Ks</span>
+                    <span class="tag">Snell Refraction</span>
+                    <span class="tag">Surf Zone</span>
+                </div>
+            </div>
+            <div class="card-footer">
+                <span>Coming Soon</span>
+                <span>•</span>
+            </div>
+        </div>
+
+    </main>
+
+    <footer>
+        <p><strong>Disclaimer:</strong> Developed purely as a browser demonstration suite for academic teaching and theory exploration. Not certified for commercial operations, navigation, or safety-critical engineering design.</p>
+        <p style="margin-top: 8px;">For suggestions or collaborations, open an issue on <a href="https://github.com/jcharris/LaHoule">GitHub</a>.</p>
+    </footer>
 
-    <script>
-        // --- ACADEMIC NOTICE LOGIC ---
-        function checkDisclaimer() {
-            if (localStorage.getItem('lahoule_disclaimer_accepted') === 'true') {
-                document.getElementById('disclaimer-modal').style.display = 'none';
-            }
-        }
-        function acceptDisclaimer() {
-            localStorage.setItem('lahoule_disclaimer_accepted', 'true');
-            document.getElementById('disclaimer-modal').style.display = 'none';
-        }
-        checkDisclaimer();
-
-        // --- 1. SHIP HYDRODYNAMIC & GEOMETRIC CONSTANTS ---
-        const L_ship = 100.0;   // Length along X-axis (m)
-        const B_ship = 13.33;   // Beam along Z-axis (m) -> L/B = 7.50
-        const T_ship = 5.33;    // Draft along Y-axis (m) -> B/T = 2.50
-        const C_B = 0.60;       // Series 60 Block Coefficient
-        const g = 9.81;
-        const rho = 1025.0;
-
-        const disp_m3 = C_B * L_ship * B_ship * T_ship;
-        const m_ship = rho * disp_m3;
-        const A_wp = 0.75 * L_ship * B_ship;
-
-        const C33 = rho * g * A_wp;                          // Heave Stiffness
-        const C44 = m_ship * g * (0.08 * B_ship);           // Roll Stiffness (GM_T)
-        const C55 = rho * g * A_wp * (L_ship ** 2) / 12.0;  // Pitch Stiffness
-
-        const I44 = m_ship * (0.35 * B_ship) ** 2;
-        const I55 = m_ship * (0.25 * L_ship) ** 2;
-
-        let activePlotMode = 'period';
-        let activeWaterMode = 'color';
-
-        // --- MOBILE DRAWER TOGGLE LOGIC ---
-        function toggleDrawer(drawerId) {
-            const el = document.getElementById(drawerId);
-            const isOpen = el.classList.contains('drawer-open');
-            closeDrawers();
-            if (!isOpen) {
-                el.classList.add('drawer-open');
-                if (drawerId === 'plot-container') Plotly.Plots.resize('plot-container');
-            }
-        }
-
-        function closeDrawers() {
-            document.getElementById('sidebar').classList.remove('drawer-open');
-            document.getElementById('plot-container').classList.remove('drawer-open');
-        }
-
-        // --- 2. THREE.JS 3D SCENE SETUP ---
-        const container = document.getElementById('canvas3d');
-        const scene = new THREE.Scene();
-
-        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 4000);
-        camera.position.set(130, 45, 130);
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-        renderer.setSize(container.clientWidth, container.clientHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.0;
-        container.appendChild(renderer.domElement);
-
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.maxPolarAngle = Math.PI / 2 + 0.1;
-
-        // Sun Directional Light
-        const dirLight = new THREE.DirectionalLight(0xfffbeb, 2.5);
-        dirLight.position.set(-500, 300, 200);
-        scene.add(dirLight);
-
-        const ambientLight = new THREE.AmbientLight(0xbae6fd, 0.6);
-        scene.add(ambientLight);
-
-        // Procedural Skybox
-        function createProceduralSkyboxCubeMap() {
-            const cubeMap = new THREE.CubeTexture([]);
-            const faceSize = 512;
-
-            function drawSkyFace(faceIndex) {
-                const canvas = document.createElement('canvas');
-                canvas.width = faceSize;
-                canvas.height = faceSize;
-                const ctx = canvas.getContext('2d');
-
-                const grad = ctx.createLinearGradient(0, 0, 0, faceSize);
-                if (faceIndex === 2) {
-                    grad.addColorStop(0, '#0284c7');
-                    grad.addColorStop(1, '#38bdf8');
-                } else if (faceIndex === 3) {
-                    grad.addColorStop(0, '#0284c7');
-                    grad.addColorStop(1, '#0f172a');
-                } else {
-                    grad.addColorStop(0, '#0284c7');
-                    grad.addColorStop(0.6, '#7dd3fc');
-                    grad.addColorStop(1.0, '#e0f2fe');
-                }
-
-                ctx.fillStyle = grad;
-                ctx.fillRect(0, 0, faceSize, faceSize);
-
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-                for (let c = 0; c < 12; c++) {
-                    const cx = (Math.sin(c * 1.7 + faceIndex) * 0.5 + 0.5) * faceSize;
-                    const cy = (Math.cos(c * 2.3 + faceIndex) * 0.3 + 0.3) * faceSize;
-                    const cr = 40 + Math.random() * 80;
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, cr, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-
-                if (faceIndex === 0) {
-                    const sunGrad = ctx.createRadialGradient(200, 180, 10, 200, 180, 160);
-                    sunGrad.addColorStop(0, '#ffffff');
-                    sunGrad.addColorStop(0.3, '#fef08a');
-                    sunGrad.addColorStop(1.0, 'rgba(255,255,255,0)');
-                    ctx.fillStyle = sunGrad;
-                    ctx.beginPath();
-                    ctx.arc(200, 180, 160, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                return canvas;
-            }
-
-            for (let i = 0; i < 6; i++) {
-                cubeMap.images[i] = drawSkyFace(i);
-            }
-            cubeMap.needsUpdate = true;
-            return cubeMap;
-        }
-
-        const envCubeMap = createProceduralSkyboxCubeMap();
-        scene.background = envCubeMap;
-
-        // --- 3. WATERTIGHT SERIES 60 SHIP HULL ---
-        function createSeries60ShipGroup() {
-            const shipGroup = new THREE.Group();
-            const geom = new THREE.BufferGeometry();
-            const n_stations = 28;
-            const n_sections = 14;
-
-            const vertices = [];
-            const indices = [];
-
-            for (let i = 0; i < n_stations; i++) {
-                const x_norm = -1.0 + (2.0 * i / (n_stations - 1));
-                const x = (L_ship / 2.0) * x_norm;
-                const wl_factor = Math.max(0.0, 1.0 - Math.pow(x_norm, 4));
-                const b_local = (B_ship / 2.0) * wl_factor;
-
-                const sheer = (x > 0) ? (0.6 * Math.pow(x / (L_ship/2.0), 2)) : 0.0;
-
-                for (let j = 0; j < n_sections; j++) {
-                    const y_norm = -1.0 + (1.5 * j / (n_sections - 1));
-                    const y = T_ship * y_norm + sheer;
-
-                    const deadrise = (y < 0) ? (1.0 - Math.pow(Math.min(0, y) / -T_ship, 2)) : 0.0;
-                    const z_stbd = Math.max(0.0, b_local * (1.0 - 0.15 * deadrise));
-
-                    vertices.push(x, y, z_stbd);
-                    vertices.push(x, y, -z_stbd);
-                }
-            }
-
-            for (let i = 0; i < n_stations - 1; i++) {
-                for (let j = 0; j < n_sections - 1; j++) {
-                    const idx0 = (i * n_sections + j) * 2;
-                    const idx1 = (i * n_sections + (j + 1)) * 2;
-                    const idx2 = ((i + 1) * n_sections + j) * 2;
-                    const idx3 = ((i + 1) * n_sections + (j + 1)) * 2;
-
-                    indices.push(idx0, idx2, idx1);
-                    indices.push(idx1, idx2, idx3);
-
-                    indices.push(idx0 + 1, idx1 + 1, idx2 + 1);
-                    indices.push(idx1 + 1, idx2 + 1, idx3 + 1);
-                }
-            }
-
-            for (let i = 0; i < n_stations - 1; i++) {
-                const idx0 = (i * n_sections) * 2;
-                const idx2 = ((i + 1) * n_sections) * 2;
-                indices.push(idx0, idx0 + 1, idx2);
-                indices.push(idx0 + 1, idx2 + 1, idx2);
-            }
-
-            for (let i = 0; i < n_stations - 1; i++) {
-                const idx0 = (i * n_sections + (n_sections - 1)) * 2;
-                const idx2 = ((i + 1) * n_sections + (n_sections - 1)) * 2;
-                indices.push(idx0, idx2, idx0 + 1);
-                indices.push(idx0 + 1, idx2, idx2 + 1);
-            }
-
-            geom.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-            geom.setIndex(indices);
-            geom.computeVertexNormals();
-
-            const hullMat = new THREE.MeshStandardMaterial({
-                color: 0x1e293b, roughness: 0.3, metalness: 0.6, side: THREE.DoubleSide
-            });
-
-            const hullMesh = new THREE.Mesh(geom, hullMat);
-            shipGroup.add(hullMesh);
-
-            // Aft Bridge Superstructure Tower (-X Stern)
-            const bridgeGeom = new THREE.BoxGeometry(12.0, 10.0, 10.0);
-            const bridgeMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3 });
-            const bridgeMesh = new THREE.Mesh(bridgeGeom, bridgeMat);
-            bridgeMesh.position.set(-L_ship / 2.0 + 18.0, T_ship * 0.75 + 5.0, 0);
-            shipGroup.add(bridgeMesh);
-
-            // Funnel
-            const funnelGeom = new THREE.CylinderGeometry(1.2, 1.5, 5.0, 12);
-            const funnelMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.4 });
-            const funnelMesh = new THREE.Mesh(funnelGeom, funnelMat);
-            funnelMesh.position.set(-L_ship / 2.0 + 14.0, T_ship * 0.75 + 12.0, 0);
-            shipGroup.add(funnelMesh);
-
-            // Forward Forecastle (+X Bow)
-            const fwdGeom = new THREE.BoxGeometry(8.0, 1.8, B_ship * 0.5);
-            const fwdMesh = new THREE.Mesh(fwdGeom, bridgeMat);
-            fwdMesh.position.set(L_ship / 2.0 - 5.0, T_ship * 0.75 + 1.2, 0);
-            shipGroup.add(fwdMesh);
-
-            // Midship Container Deck Stacks
-            const containerMat1 = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.5 });
-            const containerMat2 = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.5 });
-
-            for (let c = -1; c <= 2; c++) {
-                const cMesh1 = new THREE.Mesh(new THREE.BoxGeometry(12.0, 4.5, 9.0), containerMat1);
-                cMesh1.position.set(c * 15.0 + 5.0, T_ship * 0.75 + 2.25, 0);
-                shipGroup.add(cMesh1);
-
-                const cMesh2 = new THREE.Mesh(new THREE.BoxGeometry(12.0, 4.5, 8.0), containerMat2);
-                cMesh2.position.set(c * 15.0 + 5.0, T_ship * 0.75 + 6.75, 0);
-                shipGroup.add(cMesh2);
-            }
-
-            return shipGroup;
-        }
-
-        const hullGroup = createSeries60ShipGroup();
-        scene.add(hullGroup);
-
-        // --- 4. HIGH-VISIBILITY OCEAN WATER & DYNAMIC SEABED ---
-        const waterRes = 90;
-        const waterGeom = new THREE.PlaneGeometry(500, 500, waterRes, waterRes);
-        waterGeom.rotateX(-Math.PI / 2);
-
-        // RGB Vertex Color Buffers (Safari WebGL Fix)
-        const vertexColors = new Float32Array(waterGeom.attributes.position.count * 3);
-        for (let i = 0; i < vertexColors.length; i += 3) {
-            vertexColors[i]     = 0.05;
-            vertexColors[i + 1] = 0.50;
-            vertexColors[i + 2] = 0.85;
-        }
-        waterGeom.setAttribute('color', new THREE.BufferAttribute(vertexColors, 3));
-
-        const waterShadedMat = new THREE.MeshStandardMaterial({
-            color: 0x0284c7, roughness: 0.12, metalness: 0.85, envMap: envCubeMap, transparent: true, opacity: 0.88, flatShading: true, side: THREE.DoubleSide
-        });
-
-        const waterColorMat = new THREE.MeshBasicMaterial({
-            vertexColors: true, side: THREE.DoubleSide, wireframe: false
-        });
-
-        const waterMesh = new THREE.Mesh(waterGeom, waterColorMat);
-        scene.add(waterMesh);
-
-        // Dynamic Seabed Mesh
-        const seabedGeom = new THREE.PlaneGeometry(600, 600, 20, 20);
-        seabedGeom.rotateX(-Math.PI / 2);
-        const seabedMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9, side: THREE.DoubleSide });
-        const seabedMesh = new THREE.Mesh(seabedGeom, seabedMat);
-        seabedMesh.position.y = -100;
-        scene.add(seabedMesh);
-
-        function setWaterMode(mode) {
-            activeWaterMode = mode;
-            document.getElementById('btn-water-shaded').classList.toggle('active', mode === 'shaded');
-            document.getElementById('btn-water-color').classList.toggle('active', mode === 'color');
-            waterMesh.material = (mode === 'shaded') ? waterShadedMat : waterColorMat;
-        }
-
-        // --- 5. DISPERSION RELATIONSHIP & STRIP THEORY SOLVER ---
-        function solveDispersion(omega, depth) {
-            let k = (omega ** 2) / g;
-            for (let i = 0; i < 5; i++) {
-                k = (omega ** 2) / (g * Math.tanh(k * depth));
-            }
-            return k;
-        }
-
-        function solveStripTheory(omega, waveAmp, betaDeg, U, depth) {
-            const beta = (betaDeg * Math.PI) / 180.0;
-            const k = solveDispersion(omega, depth);
-            const omega_e = Math.abs(omega - k * U * Math.cos(beta));
-
-            const k_x = k * Math.cos(beta);
-
-            // Integrated 2D Coefficients
-            const A33 = m_ship * 0.45;
-            const B33 = m_ship * 0.12 * omega_e;
-
-            const A44 = I44 * 0.25;
-            const B44_wave = I44 * 0.02 * omega_e;
-            const B44_visc = 0.10 * 2.0 * Math.sqrt((I44 + A44) * C44); 
-            const B44 = B44_wave + B44_visc;
-
-            const A55 = I55 * 0.40;
-            const B55 = I55 * 0.15 * omega_e;
-
-            // Excitation Forces (With Corrected Long-Wave Asymptote Limit -> 1.0)
-            const sinc_val = Math.abs(Math.sin(k_x * L_ship / 2.0) / (k_x * L_ship / 2.0 || 1.0));
-            const F3_mag = C33 * waveAmp * (0.2 + 0.8 * sinc_val);
-            const F4_mag = rho * g * A_wp * (B_ship / 8.0) * waveAmp * Math.sin(beta);
-            const F5_mag = C55 * (k * waveAmp) * (0.2 + 0.8 * sinc_val);
-
-            // Motion Amplitudes
-            const Z3 = { re: C33 - (omega_e ** 2) * (m_ship + A33), im: omega_e * B33 };
-            const Z4 = { re: C44 - (omega_e ** 2) * (I44 + A44), im: omega_e * B44 };
-            const Z5 = { re: C55 - (omega_e ** 2) * (I55 + A55), im: omega_e * B55 };
-
-            const xi3 = F3_mag / Math.hypot(Z3.re, Z3.im);
-            const xi4 = F4_mag / Math.hypot(Z4.re, Z4.im);
-            const xi5 = F5_mag / Math.hypot(Z5.re, Z5.im);
-
-            return { xi3, xi4, xi5, omega_e, k };
-        }
-
-        // --- 6. PLOTLY LIVE RAO SPECTRUM PANEL ---
-        function initPlots() {
-            const periodVec = Array.from({length: 40}, (_, i) => 4.0 + i * 0.4);
-            
-            const traceHeave = { x: periodVec, y: periodVec.map(() => 0), name: 'Heave', line: { color: '#38bdf8', width: 2 }, xaxis: 'x', yaxis: 'y' };
-            const traceRoll  = { x: periodVec, y: periodVec.map(() => 0), name: 'Roll',  line: { color: '#f43f5e', width: 2 }, xaxis: 'x2', yaxis: 'y2' };
-            const tracePitch = { x: periodVec, y: periodVec.map(() => 0), name: 'Pitch', line: { color: '#a855f7', width: 2 }, xaxis: 'x3', yaxis: 'y3' };
-
-            const layout = {
-                margin: { t: 35, b: 35, l: 45, r: 15 },
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                showlegend: false,
-                
-                xaxis:  { title: { text: 'Period T (s)', font: { color: '#f8fafc', size: 11 } }, tickfont: { color: '#f8fafc' }, gridcolor: '#334155', domain: [0, 0.28] },
-                yaxis:  { title: { text: 'Heave |ξ₃|/A [m/m]', font: { color: '#38bdf8', size: 11 } }, tickfont: { color: '#f8fafc' }, gridcolor: '#334155', zeroline: false },
-                
-                xaxis2: { title: { text: 'Period T (s)', font: { color: '#f8fafc', size: 11 } }, tickfont: { color: '#f8fafc' }, gridcolor: '#334155', domain: [0.36, 0.64] },
-                yaxis2: { title: { text: 'Roll |ξ₄|/α [deg/m]', font: { color: '#f43f5e', size: 11 } }, tickfont: { color: '#f8fafc' }, gridcolor: '#334155', zeroline: false, anchor: 'x2' },
-                
-                xaxis3: { title: { text: 'Period T (s)', font: { color: '#f8fafc', size: 11 } }, tickfont: { color: '#f8fafc' }, gridcolor: '#334155', domain: [0.72, 1.0] },
-                yaxis3: { title: { text: 'Pitch |ξ₅|/α [deg/m]', font: { color: '#a855f7', size: 11 } }, tickfont: { color: '#f8fafc' }, gridcolor: '#334155', zeroline: false, anchor: 'x3' },
-                
-                height: 250
-            };
-
-            Plotly.newPlot('plot-container', [traceHeave, traceRoll, tracePitch], layout, {responsive: true});
-        }
-        initPlots();
-
-        function setPlotMode(mode) {
-            activePlotMode = mode;
-            ['btn-period', 'btn-omega', 'btn-hz'].forEach(id => document.getElementById(id).classList.remove('active'));
-            document.getElementById('btn-' + mode).classList.add('active');
-
-            const betaDeg = parseFloat(document.getElementById('slider-beta').value);
-            const U = parseFloat(document.getElementById('slider-speed').value);
-            const depth = parseFloat(document.getElementById('slider-depth').value);
-
-            let titleText = 'Period T (s)';
-            if (mode === 'omega') titleText = 'Freq ω (rad/s)';
-            if (mode === 'hz') titleText = 'Freq f (Hz)';
-
-            Plotly.relayout('plot-container', {
-                'xaxis.title.text': titleText,
-                'xaxis2.title.text': titleText,
-                'xaxis3.title.text': titleText
-            });
-
-            updateRAOPlot(betaDeg, U, depth);
-        }
-
-        function updateRAOPlot(betaDeg, U, depth) {
-            const periodVec = Array.from({length: 40}, (_, i) => 4.0 + i * 0.4);
-            const xValVec = [];
-            const heaveRAO = [];
-            const rollRAO  = [];
-            const pitchRAO = [];
-
-            periodVec.forEach(T => {
-                const omega = (2 * Math.PI) / T;
-                const k_wave = solveDispersion(omega, depth);
-                const res = solveStripTheory(omega, 1.0, betaDeg, U, depth);
-
-                if (activePlotMode === 'period') xValVec.push(T);
-                if (activePlotMode === 'omega') xValVec.push(omega);
-                if (activePlotMode === 'hz') xValVec.push(omega / (2 * Math.PI));
-
-                const waveSlope_rad = Math.max(1e-4, k_wave * 1.0);
-                const waveSlope_deg = waveSlope_rad * (180.0 / Math.PI);
-
-                // Zero suppression for Roll in pure Head/Following Seas
-                let rollVal_deg = (res.xi4 * 180.0 / Math.PI) / waveSlope_deg;
-                if (Math.abs(Math.sin(betaDeg * Math.PI / 180.0)) < 1e-3) rollVal_deg = 0.0;
-
-                let pitchVal_deg = (res.xi5 * 180.0 / Math.PI) / waveSlope_deg;
-
-                heaveRAO.push(res.xi3);
-                rollRAO.push(rollVal_deg);
-                pitchRAO.push(pitchVal_deg);
-            });
-
-            Plotly.update('plot-container', { x: [xValVec, xValVec, xValVec], y: [heaveRAO, rollRAO, pitchRAO] });
-        }
-
-        // --- 7. REAL-TIME ANIMATION LOOP & SEVERITY THRESHOLDS ---
-        const clock = new THREE.Clock();
-
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-
-            const t0 = performance.now();
-            const time = clock.getElapsedTime();
-
-            // Read UI Sliders
-            const T = parseFloat(document.getElementById('slider-period').value);
-            const A = parseFloat(document.getElementById('slider-amp').value);
-            const betaDeg = parseFloat(document.getElementById('slider-beta').value);
-            const U = parseFloat(document.getElementById('slider-speed').value);
-            const depth = parseFloat(document.getElementById('slider-depth').value);
-
-            // Dynamic Seabed Position Tracking
-            if (seabedMesh) {
-                seabedMesh.position.y = -depth;
-            }
-
-            const omega = (2 * Math.PI) / T;
-            const sol = solveStripTheory(omega, A, betaDeg, U, depth);
-            const beta = (betaDeg * Math.PI) / 180.0;
-            const T_e = (2.0 * Math.PI) / (sol.omega_e || 1e-4);
-
-            // Zero suppression for Roll in Head/Following Seas
-            if (Math.abs(Math.sin(beta)) < 1e-3) sol.xi4 = 0.0;
-
-            // Decoupled Ship Motions
-            if (hullGroup) {
-                hullGroup.position.y = sol.xi3 * Math.cos(sol.omega_e * time);
-                hullGroup.rotation.x = sol.xi4 * Math.cos(sol.omega_e * time - 0.5); // Roll heel
-                hullGroup.rotation.z = sol.xi5 * Math.sin(sol.omega_e * time - 0.8); // Pitch trim
-            }
-
-            // Animate Ocean Water Surface Waves
-            if (waterMesh && waterMesh.geometry.attributes.position) {
-                const pos = waterMesh.geometry.attributes.position;
-                const colAttr = waterMesh.geometry.attributes.color;
-                const k_x = sol.k * Math.cos(beta);
-                const k_z = sol.k * Math.sin(beta);
-
-                for (let i = 0; i < pos.count; i++) {
-                    const x = pos.getX(i);
-                    const z = pos.getZ(i);
-                    const phase = k_x * x + k_z * z - sol.omega_e * time;
-                    const eta = A * Math.cos(phase);
-                    pos.setY(i, eta);
-
-                    // False-Color Height Map Shader Logic
-                    if (colAttr) {
-                        const norm_eta = Math.max(0.0, Math.min(1.0, (eta / Math.max(0.1, A) + 1.0) * 0.5));
-                        colAttr.setXYZ(i, 0.05 + 0.95 * norm_eta, 0.4 + 0.6 * norm_eta, 0.8 + 0.2 * norm_eta);
-                    }
-                }
-                pos.needsUpdate = true;
-                if (colAttr) colAttr.needsUpdate = true;
-                waterMesh.geometry.computeVertexNormals();
-            }
-
-            // --- SEVERITY COLOR THRESHOLDS (Green/Yellow/Red) ---
-            const heaveElem = document.getElementById('dash-heave');
-            const rollElem = document.getElementById('dash-roll');
-            const pitchElem = document.getElementById('dash-pitch');
-
-            const heave_m = sol.xi3;
-            const roll_deg = sol.xi4 * 180.0 / Math.PI;
-            const pitch_deg = sol.xi5 * 180.0 / Math.PI;
-
-            heaveElem.innerText = heave_m.toFixed(2) + ' m';
-            heaveElem.className = 'dash-val ' + (heave_m > 2.5 ? 'val-red' : (heave_m > 1.0 ? 'val-yellow' : 'val-green'));
-
-            rollElem.innerText = roll_deg.toFixed(1) + '°';
-            rollElem.className = 'dash-val ' + (roll_deg > 10.0 ? 'val-red' : (roll_deg > 4.0 ? 'val-yellow' : 'val-green'));
-
-            pitchElem.innerText = pitch_deg.toFixed(1) + '°';
-            pitchElem.className = 'dash-val ' + (pitch_deg > 3.5 ? 'val-red' : (pitch_deg > 1.5 ? 'val-yellow' : 'val-green'));
-
-            // Relative Motion at Bow Stem (x = +50m) for Bow Slamming Assessment
-            const wave_at_bow = A * Math.cos(sol.k * Math.cos(beta) * (L_ship/2) - sol.omega_e * time);
-            const relative_bow_motion = Math.abs(heave_m - (L_ship/2) * (sol.xi5) - wave_at_bow);
-
-            const slamElem = document.getElementById('overlay-slam');
-            if (relative_bow_motion > T_ship) {
-                slamElem.innerText = 'HIGH (EMERGENCE)';
-                slamElem.style.color = '#ef4444';
-            } else if (relative_bow_motion > T_ship * 0.7) {
-                slamElem.innerText = 'MODERATE';
-                slamElem.style.color = '#eab308';
-            } else {
-                slamElem.innerText = 'LOW';
-                slamElem.style.color = '#22c55e';
-            }
-
-            document.getElementById('dash-omegae').innerText = sol.omega_e.toFixed(2) + ' rad/s';
-            document.getElementById('overlay-omegae').innerText = sol.omega_e.toFixed(2) + ' rad/s';
-            document.getElementById('overlay-te').innerText = T_e.toFixed(1) + ' s';
-            document.getElementById('solve-time').innerText = (performance.now() - t0).toFixed(2) + ' ms';
-
-            renderer.render(scene, camera);
-        }
-        animate();
-
-        // --- 8. UI EVENT LISTENERS ---
-        function updateUI() {
-            const T = document.getElementById('slider-period').value;
-            const A = document.getElementById('slider-amp').value;
-            const beta = document.getElementById('slider-beta').value;
-            const U = document.getElementById('slider-speed').value;
-            const depth = document.getElementById('slider-depth').value;
-
-            document.getElementById('val-period').innerText = T + ' s';
-            document.getElementById('val-amp').innerText = A + ' m';
-            document.getElementById('val-beta').innerText = beta + '°';
-            document.getElementById('val-speed').innerText = U + ' m/s (' + (U * 1.94384).toFixed(1) + ' kts)';
-            document.getElementById('val-depth').innerText = depth + ' m';
-
-            updateRAOPlot(parseFloat(beta), parseFloat(U), parseFloat(depth));
-        }
-
-        ['slider-period', 'slider-amp', 'slider-beta', 'slider-speed', 'slider-depth'].forEach(id => {
-            document.getElementById(id).addEventListener('input', updateUI);
-        });
-
-        updateUI(); // Initial Run
-
-        window.addEventListener('resize', () => {
-            camera.aspect = container.clientWidth / container.clientHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            if (window.innerWidth <= 900) {
-                Plotly.Plots.resize('plot-container');
-            }
-        });
-    </script>
 </body>
 </html>

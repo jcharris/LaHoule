@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>LaHoule FOWT - NREL 5MW OC3-Spar Aero-Hydro-Servo-Elastic Suite</title>
+
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+
+    <link rel="stylesheet" href="css/fowt.css">
+
+    <!-- Three.js, OrbitControls & Plotly -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+</head>
+<body>
+
+    <!-- Left Controls Sidebar -->
+    <div id="sidebar">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+                <h1>💨 LaHoule FOWT</h1>
+                <div class="subtitle">NREL 5MW / OC3-Spar Aero-Hydro-Servo-Elastic</div>
+                <div class="attribution">Jeffrey Harris (2026)</div>
+            </div>
+            <button id="btn-pause" class="btn-action" onclick="togglePause()">⏸ Pause</button>
+        </div>
+
+        <!-- Live Metrics Dashboard -->
+        <div class="dash-grid">
+            <div class="dash-card">
+                <div class="dash-title">Power (MW)</div>
+                <div id="dash-power" class="dash-val" style="color: #22c55e;">0.0 MW</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-title">Blade Pitch</div>
+                <div id="dash-pitch" class="dash-val" style="color: #38bdf8;">0.0°</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-title">Plat Pitch</div>
+                <div id="dash-platpitch" class="dash-val" style="color: #eab308;">0.0°</div>
+            </div>
+            <div class="dash-card">
+                <div class="dash-title">Thrust (kN)</div>
+                <div id="dash-thrust" class="dash-val" style="color: #a855f7;">0 kN</div>
+            </div>
+        </div>
+
+        <div class="fowt-box">
+            <strong>NREL 5 MW / OC3-Hywind Benchmark:</strong><br>
+            • <strong>Rotor / Hub:</strong> D = 126 m, H = 90 m &nbsp;|&nbsp; <strong>Spar Draft:</strong> 120 m<br>
+            • <strong>Controller:</strong> Gain-Scheduled Collective Pitch (Region 3)<br>
+            • <strong>Tower:</strong> 1st Fore-Aft Elastic Bending Mode (0.45 Hz)
+        </div>
+
+        <hr style="border-color: #334155;">
+
+        <!-- Wind Parameters -->
+        <div class="control-group">
+            <label>Wind Speed V<sub>hub</sub> (m/s) <span id="val-wind" class="value-badge">12.0 m/s</span></label>
+            <input type="range" id="slider-wind" min="4.0" max="25.0" step="0.5" value="12.0">
+        </div>
+
+        <div class="control-group">
+            <label>Wind Heading &beta;<sub>wind</sub> (deg) <span id="val-wind-dir" class="value-badge">0° (Head)</span></label>
+            <input type="range" id="slider-wind-dir" min="-180" max="180" step="5" value="0">
+        </div>
+
+        <!-- Equilibrium Sea State Toggle -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin: 2px 0;">
+            <label style="font-size: 0.78rem; font-weight: 600;">Snap Waves to Wind Equilibrium</label>
+            <input type="checkbox" id="check-equilibrium" style="accent-color: #38bdf8; cursor: pointer;">
+        </div>
+
+        <!-- Wave Parameters -->
+        <div class="control-group">
+            <label>Wave Height H<sub>s</sub> (m) <span id="val-hs" class="value-badge">3.0 m</span></label>
+            <input type="range" id="slider-hs" min="0.5" max="9.0" step="0.2" value="3.0">
+        </div>
+
+        <div class="control-group">
+            <label>Wave Peak Period T<sub>p</sub> (s) <span id="val-tp" class="value-badge">10.0 s</span></label>
+            <input type="range" id="slider-tp" min="4.0" max="20.0" step="0.5" value="10.0">
+        </div>
+
+        <div class="control-group">
+            <label>Wave Heading &beta;<sub>wave</sub> (deg) <span id="val-wave-dir" class="value-badge">0°</span></label>
+            <input type="range" id="slider-wave-dir" min="-180" max="180" step="5" value="0">
+        </div>
+
+        <div class="control-group">
+            <label>Directional Spreading (s) <span id="val-spread" class="value-badge">s = 2 (Short-Crested)</span></label>
+            <input type="range" id="slider-spread" min="0" max="10" step="1" value="2">
+        </div>
+
+        <div class="control-group">
+            <label>Water Depth d (m) <span id="val-depth" class="value-badge">300 m</span></label>
+            <input type="range" id="slider-depth" min="120" max="500" step="10" value="300">
+        </div>
+
+        <hr style="border-color: #334155;">
+
+        <!-- Pitch Controller Tuning -->
+        <div class="control-group">
+            <label>Pitch Controller Proportional Gain K<sub>p</sub> <span id="val-kp" class="value-badge">0.015</span></label>
+            <input type="range" id="slider-kp" min="0.000" max="0.040" step="0.001" value="0.015">
+        </div>
+
+        <div class="control-group">
+            <label>Pitch Controller Integral Gain K<sub>i</sub> <span id="val-ki" class="value-badge">0.008</span></label>
+            <input type="range" id="slider-ki" min="0.000" max="0.020" step="0.001" value="0.008">
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 2px;">
+            <label style="font-size: 0.78rem; font-weight: 600;">Floating Gain Detuning</label>
+            <input type="checkbox" id="check-detune" checked style="accent-color: #38bdf8; cursor: pointer;">
+        </div>
+
+        <div style="font-size: 0.72rem; color: #94a3b8; line-height: 1.35; margin-top: 6px;">
+            <strong>Teaching Notes:</strong><br>
+            • <strong>Spreading = 0:</strong> Produces purely long-crested unidirectional waves.<br>
+            • <strong>Instability Test:</strong> Uncheck "Floating Gain Detuning" with wind > 12 m/s to trigger negative aerodynamic damping pitch resonance.
+        </div>
+    </div>
+
+    <!-- Right 3D Viewport -->
+    <div id="viewport-container">
+        <div id="status-overlay">
+            Rotor Speed: <span id="overlay-rpm">12.1 RPM</span><br>
+            Tower Bending: <span id="overlay-flex">0.35 m</span><br>
+            Misalignment: <span id="overlay-misalign">0.0°</span>
+        </div>
+
+        <div id="canvas3d"></div>
+        <div id="plot-container"></div>
+    </div>
+
+    <script src="js/fowt_app.js"></script>
+</body>
+</html>
