@@ -170,7 +170,7 @@ fowtGroup.add(towerGroup);
 
 // RNA: Nacelle & Hub
 const rnaGroup = new THREE.Group();
-rnaGroup.position.set(0, 80.0, 0);
+rnaGroup.position.set(0, 80.0, 0); // At H = 90m
 
 const nacelleMesh = new THREE.Mesh(
     new THREE.BoxGeometry(18.0, 4.2, 4.2),
@@ -188,7 +188,7 @@ hubGroup.add(hubMesh);
 // 3 Blades with Pitch Articulation
 const blades = [];
 const bladeGeom = new THREE.BoxGeometry(1.2, R_rotor, 0.4);
-bladeGeom.translate(0, R_rotor / 2.0, 0);
+bladeGeom.translate(0, R_rotor / 2.0, 0); // Starts at origin, extends along +Y
 const bladeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25 });
 
 for (let b = 0; b < 3; b++) {
@@ -204,6 +204,7 @@ rnaGroup.add(hubGroup);
 // =========================================================================
 // 4. DOWNSTREAM WAKE: 3 EXPANDING HELICAL TIP VORTICES
 // =========================================================================
+// Parented directly to hubGroup: guarantees exact origin and rotor rotation coupling
 const wakeGroup = new THREE.Group();
 wakeGroup.position.set(0, 0, 0);
 
@@ -224,7 +225,7 @@ for (let v = 0; v < 3; v++) {
     wakeGroup.add(line);
     vortexLines.push(line);
 }
-rnaGroup.add(wakeGroup);
+hubGroup.add(wakeGroup);
 
 towerGroup.add(rnaGroup);
 scene.add(fowtGroup);
@@ -233,17 +234,32 @@ function updateWake(CT, V_wind) {
     const a = 0.5 * (1.0 - Math.sqrt(Math.max(0.04, 1.0 - CT)));
     const expansion = Math.sqrt((1.0 - a) / Math.max(0.15, 1.0 - 2.0 * a));
 
+    // Convection velocity downstream
     const V_wake = Math.max(2.0, V_wind * (1.0 - 2.0 * a));
+    
+    // Spatial pitch: distance flow travels downstream in one rotor period
     const spiralPitch = (2.0 * Math.PI * V_wake) / Math.max(0.4, state.omega_rotor);
 
     for (let v = 0; v < 3; v++) {
-        const offset = (v * 2 * Math.PI) / 3;
+        // Aligns with bladeRoot.rotation.x = (v * 2 * Math.PI) / 3
+        const bladeAngle = (v * 2 * Math.PI) / 3;
         const pts = [];
+        
         for (let i = 0; i <= numSpiralPts; i++) {
-            const x = (i / numSpiralPts) * 240.0;
-            const r = R_rotor * (1.0 + (expansion - 1.0) * (x / 240.0));
-            const theta = offset - (x / spiralPitch) * (2.0 * Math.PI) + rotorAngle;
-            pts.push(new THREE.Vector3(x - 7.0, r * Math.sin(theta), r * Math.cos(theta)));
+            // Distance downstream (+X in local hub coordinate frame)
+            const x_dist = (i / numSpiralPts) * 240.0;
+            const r = R_rotor * (1.0 + (expansion - 1.0) * (x_dist / 240.0));
+            
+            // In the rotating hub frame:
+            // At x_dist = 0, theta = bladeAngle (pinned exactly to blade tip v)
+            // As x_dist increases downstream, older fluid lags behind the advancing rotor (+ sign)
+            const theta = bladeAngle + (x_dist / spiralPitch) * (2.0 * Math.PI);
+            
+            // Blade span is along +Y rotated around +X:
+            const y = r * Math.cos(theta);
+            const z = -r * Math.sin(theta);
+            
+            pts.push(new THREE.Vector3(x_dist, y, z));
         }
         vortexLines[v].geometry.setFromPoints(pts);
     }
