@@ -16,7 +16,6 @@ const Omega_tower_nat = Math.sqrt(K_tower / (M_tower_equiv + Mass_rna)); // ~0.4
 const C_tower = 0.02 * 2.0 * (M_tower_equiv + Mass_rna) * Omega_tower_nat; // 2% structural damping
 
 // Benchmark Hydrodynamic & Mooring Stiffness (Jonkman et al., NREL/TP-500-38060)
-// Total Pitch Stiffness C55 = Hydrostatic (rho*g*V*(zB - zG) + rho*g*Iwp) + Mooring K55
 const C55_total = 1.34e9;        // N*m/rad (Benchmark calibrated)
 const C55_damping = 2.8e8;       // Radiation + Viscous Damping (N*m*s/rad)
 const K_mooring_surge = 41100.0; // Horizontal Surge Stiffness (N/m)
@@ -39,32 +38,35 @@ let rotorAngle = 0.0;
 let isSimulationPaused = false;
 
 // =========================================================================
-// 2. THREE.JS SCENE, SKYBOX & LIGHTING
+// 2. THREE.JS SCENE, SKYBOX & LIGHTING SETUP
 // =========================================================================
 const container = document.getElementById('canvas3d');
 const scene = new THREE.Scene();
 
-const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.5, 4000);
+const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.5, 6000);
 camera.position.set(220, 60, 240);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
 renderer.setSize(container.clientWidth, container.clientHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 1.25;
 container.appendChild(renderer.domElement);
 
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.minDistance = 20;
+controls.maxDistance = 2500;
 
 // Directional Sunlight & Sky Ambient
-const sunLight = new THREE.DirectionalLight(0xfffbeb, 2.8);
-sunLight.position.set(-600, 400, 300);
+const sunLight = new THREE.DirectionalLight(0xfff6e5, 3.0);
+sunLight.position.set(-600, 350, 450);
 scene.add(sunLight);
-scene.add(new THREE.AmbientLight(0xb0e0e6, 0.65));
+scene.add(new THREE.AmbientLight(0x64748b, 0.75));
 
-// Procedural Multi-Gradient Skybox
+// Procedural Multi-Gradient Skybox Fallback
 function buildSkybox() {
     const cubeMap = new THREE.CubeTexture([]);
     const size = 512;
@@ -75,31 +77,20 @@ function buildSkybox() {
 
         const grad = ctx.createLinearGradient(0, 0, 0, size);
         if (i === 2) { // Zenith (Top)
-            grad.addColorStop(0.0, '#0369a1');
-            grad.addColorStop(1.0, '#0284c7');
+            grad.addColorStop(0.0, '#1e3a8a');
+            grad.addColorStop(1.0, '#3b82f6');
         } else if (i === 3) { // Nadir (Bottom)
-            grad.addColorStop(0.0, '#0c4a6e');
-            grad.addColorStop(1.0, '#0284c7');
+            grad.addColorStop(0.0, '#0f172a');
+            grad.addColorStop(1.0, '#1e293b');
         } else { // Horizon Sides
-            grad.addColorStop(0.0, '#0284c7');
-            grad.addColorStop(0.65, '#bae6fd');
-            grad.addColorStop(0.85, '#e0f2fe');
-            grad.addColorStop(1.0, '#f8fafc');
+            grad.addColorStop(0.0, '#1e3a8a');
+            grad.addColorStop(0.55, '#60a5fa');
+            grad.addColorStop(0.85, '#93c5fd');
+            grad.addColorStop(1.0, '#e2e8f0');
         }
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, size, size);
 
-        // Sun disc on face 0
-        if (i === 0) {
-            const radGrad = ctx.createRadialGradient(256, 200, 8, 256, 200, 140);
-            radGrad.addColorStop(0, '#ffffff');
-            radGrad.addColorStop(0.3, '#fef08a');
-            radGrad.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.fillStyle = radGrad;
-            ctx.beginPath();
-            ctx.arc(256, 200, 140, 0, Math.PI * 2);
-            ctx.fill();
-        }
         cubeMap.images[i] = canvas;
     }
     cubeMap.needsUpdate = true;
@@ -107,6 +98,26 @@ function buildSkybox() {
 }
 const envSkyMap = buildSkybox();
 scene.background = envSkyMap;
+
+// Texture Loaders (Equirectangular Sky + Normal Map)
+const textureLoader = new THREE.TextureLoader();
+let waterNormalTex = null;
+
+textureLoader.load('textures/sky.jpg', function(tex) {
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    scene.background = tex;
+    waterMat.envMap = tex;
+    waterMat.needsUpdate = true;
+});
+
+textureLoader.load('textures/waternormals.jpg', function(tex) {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(12.0, 12.0);
+    waterNormalTex = tex;
+    waterMat.normalMap = waterNormalTex;
+    waterMat.normalScale = new THREE.Vector2(0.06, 0.06);
+    waterMat.needsUpdate = true;
+});
 
 // =========================================================================
 // 3. FOWT RIGID-BODY & ELASTIC MODEL ASSEMBLY
@@ -116,7 +127,7 @@ const fowtGroup = new THREE.Group();
 // Spar Buoy (-120m to +10m)
 const sparMesh = new THREE.Mesh(
     new THREE.CylinderGeometry(4.7, 4.7, 130, 32),
-    new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.35, metalness: 0.3 })
+    new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.35, metalness: 0.25 })
 );
 sparMesh.position.y = -55;
 fowtGroup.add(sparMesh);
@@ -178,7 +189,6 @@ rnaGroup.add(hubGroup);
 // =========================================================================
 // 4. DOWNSTREAM WAKE: 3 EXPANDING HELICAL TIP VORTICES
 // =========================================================================
-// Parented directly to rnaGroup so it automatically inherits nacelle yaw
 const wakeGroup = new THREE.Group();
 wakeGroup.position.set(0, 0, 0);
 
@@ -208,9 +218,7 @@ function updateWake(CT, V_wind) {
     const a = 0.5 * (1.0 - Math.sqrt(Math.max(0.04, 1.0 - CT)));
     const expansion = Math.sqrt((1.0 - a) / Math.max(0.15, 1.0 - 2.0 * a));
 
-    // V_wake = V_wind * (1 - 2a)
     const V_wake = Math.max(2.0, V_wind * (1.0 - 2.0 * a));
-    // Kinematic spatial pitch: lambda = (2 * pi * V_wake) / Omega (m/turn)
     const spiralPitch = (2.0 * Math.PI * V_wake) / Math.max(0.4, state.omega_rotor);
 
     for (let v = 0; v < 3; v++) {
@@ -219,7 +227,6 @@ function updateWake(CT, V_wind) {
         for (let i = 0; i <= numSpiralPts; i++) {
             const x = (i / numSpiralPts) * 240.0;
             const r = R_rotor * (1.0 + (expansion - 1.0) * (x / 240.0));
-            // In local nacelle coordinates: rotor is at x = -7m, wake expands downstream (+X)
             const theta = offset - (x / spiralPitch) * (2.0 * Math.PI) + rotorAngle;
             pts.push(new THREE.Vector3(x - 7.0, r * Math.sin(theta), r * Math.cos(theta)));
         }
@@ -231,8 +238,8 @@ function updateWake(CT, V_wind) {
 // 5. SEABED & TOUCHDOWN CATENARY MOORING LINES
 // =========================================================================
 const seabedMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(1800, 1800, 10, 10),
-    new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95, side: THREE.DoubleSide })
+    new THREE.PlaneGeometry(1800, 1800, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0x141210, roughness: 0.96, metalness: 0.0, side: THREE.DoubleSide })
 );
 seabedMesh.rotation.x = -Math.PI / 2;
 scene.add(seabedMesh);
@@ -270,7 +277,6 @@ function updateCatenary(depth) {
             const x = THREE.MathUtils.lerp(fairleadWorld.x, anchorX, t);
             const z = THREE.MathUtils.lerp(fairleadWorld.z, anchorZ, t);
 
-            // Catenary sag with floor touchdown clamp
             const sag = (depth * 0.32) * Math.sin(Math.PI * t) * (1.0 - 0.22 * t);
             const y = Math.max(anchorY, THREE.MathUtils.lerp(fairleadWorld.y, anchorY, t) - sag);
             pts.push(new THREE.Vector3(x, y, z));
@@ -280,23 +286,24 @@ function updateCatenary(depth) {
 }
 
 // =========================================================================
-// 6. IRREGULAR MONTE CARLO JONSWAP SEA STATE WITH SURFACE SCATTERING
+// 6. REALISTIC PBR OCEAN SURFACE WITH MONTE CARLO JONSWAP SPECTRUM
 // =========================================================================
-const waterGeom = new THREE.PlaneGeometry(850, 850, 80, 80);
+const waterGeom = new THREE.PlaneGeometry(900, 900, 100, 100);
 waterGeom.rotateX(-Math.PI / 2);
+
 const waterMat = new THREE.MeshStandardMaterial({
-    color: 0x0284c7,
-    roughness: 0.25,      // Eliminates flat mirror effect
-    metalness: 0.65,      // Softens direct specular glints into ocean sheen
+    color: 0x091c2b,
+    roughness: 0.12,
+    metalness: 0.10,
     envMap: envSkyMap,
     transparent: true,
-    opacity: 0.88,
+    opacity: 0.94,
     side: THREE.DoubleSide
 });
 const waterMesh = new THREE.Mesh(waterGeom, waterMat);
 scene.add(waterMesh);
 
-// 36 Monte Carlo JONSWAP Components with Non-Repeating Partitions
+// 36 Monte Carlo JONSWAP Components
 const numComps = 36;
 const waveComps = [];
 for (let i = 0; i < numComps; i++) {
@@ -314,24 +321,27 @@ for (let i = 0; i < numComps; i++) {
     });
 }
 
-function updateOcean(time, Hs, Tp, spreadingS, waveHeadingRad) {
+function updateOcean(time, Hs, Tp, spreadingS, waveHeadingRad, depth) {
     const pos = waterGeom.attributes.position;
-    const normals = waterGeom.attributes.normal;
     const omega_p = (2 * Math.PI) / Math.max(1.0, Tp);
+
+    // Normal texture advection along wave direction
+    if (waterNormalTex) {
+        const advectSpeed = 0.003;
+        waterNormalTex.offset.x = (time * advectSpeed * Math.cos(waveHeadingRad)) % 1.0;
+        waterNormalTex.offset.y = (time * advectSpeed * Math.sin(waveHeadingRad)) % 1.0;
+    }
 
     for (let i = 0; i < pos.count; i++) {
         const x = pos.getX(i);
         const z = pos.getZ(i);
         let eta = 0.0;
-        let grad_x = 0.0;
-        let grad_z = 0.0;
 
         for (let c = 0; c < numComps; c++) {
             const comp = waveComps[c];
             const omega = omega_p * comp.freqFactor;
             const k = (omega ** 2) / g;
 
-            // Spreading: s = 0 -> purely long-crested
             let theta = waveHeadingRad;
             let dirWeight = 1.0;
             if (spreadingS > 0) {
@@ -344,49 +354,35 @@ function updateOcean(time, Hs, Tp, spreadingS, waveHeadingRad) {
             const k_z = k * Math.sin(theta);
             const phase = k_x * x + k_z * z - omega * time + comp.phase;
 
-            eta += amp * Math.cos(phase);
-
-            const slope = amp * -Math.sin(phase);
-            grad_x += slope * k_x;
-            grad_z += slope * k_z;
+            // Primary harmonic + Stokes crest-peaking perturbation
+            let compEta = amp * Math.cos(phase);
+            compEta += 0.25 * (amp * amp / Math.max(10.0, depth)) * Math.cos(2.0 * phase);
+            eta += compEta;
         }
 
-        // High-frequency micro-capillary slope scattering
-        const microJitterX = Math.sin(x * 0.4 + time * 2.0) * Math.cos(z * 0.3) * 0.04;
-        const microJitterZ = Math.cos(x * 0.3 - time * 1.7) * Math.sin(z * 0.4) * 0.04;
-
         pos.setY(i, eta);
-
-        const nx = -(grad_x + microJitterX);
-        const nz = -(grad_z + microJitterZ);
-        const invLen = 1.0 / Math.sqrt(nx * nx + 1.0 + nz * nz);
-        normals.setXYZ(i, nx * invLen, invLen, nz * invLen);
     }
     pos.needsUpdate = true;
-    normals.needsUpdate = true;
+    waterGeom.computeVertexNormals();
 }
 
 // =========================================================================
 // 7. AERO-HYDRO-SERVO-ELASTIC NUMERICAL SOLVER
 // =========================================================================
 function solvePhysicsSubStep(dt, V_wind, windHeadingRad, waveHeadingRad, Hs, Tp, Kp, Ki, detuneEnabled, time) {
-    // Yaw Nacelle into Wind
     rnaGroup.rotation.y = -windHeadingRad;
 
-    // Relative Wind Speed at Hub
     const V_surge = state.surge_dot * Math.cos(windHeadingRad);
     const V_pitch = (H_hub * (state.pitch_dot * Math.PI / 180.0) + state.q_tower_dot) * Math.cos(windHeadingRad);
     const V_rel = Math.max(0.1, V_wind - (V_surge + V_pitch));
 
-    // Rated Rotor Speed: 12.1 RPM = 1.267 rad/s
     const Omega_rated = 1.267;
     const speed_error = state.omega_rotor - Omega_rated;
 
-    // Gain Scheduling & Floating Detuning
     let eff_Kp = Kp;
     let eff_Ki = Ki;
     if (detuneEnabled) {
-        eff_Kp *= 0.5; // Avoid negative damping resonance at platform natural period (~30s)
+        eff_Kp *= 0.5;
         eff_Ki *= 0.35;
     }
 
@@ -398,40 +394,32 @@ function solvePhysicsSubStep(dt, V_wind, windHeadingRad, waveHeadingRad, Hs, Tp,
         state.integral_err = 0.0;
     }
 
-    // Aerodynamic Coefficients
     const C_T = Math.max(0.05, 0.82 * Math.cos(state.blade_pitch_rad));
     const C_P = Math.max(0.02, 0.48 * Math.pow(Math.cos(state.blade_pitch_rad), 2));
 
     const F_thrust = 0.5 * rho_air * (Math.PI * R_rotor ** 2) * C_T * (V_rel ** 2);
     const P_aero = 0.5 * rho_air * (Math.PI * R_rotor ** 2) * C_P * (V_rel ** 3);
 
-    // Rotor Acceleration: J_drivetrain dOmega/dt = Q_aero - Q_gen
     const Q_aero = P_aero / Math.max(0.1, state.omega_rotor);
     const Q_gen = Math.min(P_aero, 5.0e6 / Omega_rated);
     const J_rotor = 3.5e7;
     state.omega_rotor += ((Q_aero - Q_gen) / J_rotor) * dt;
     state.omega_rotor = Math.max(0.3, Math.min(1.35, state.omega_rotor));
 
-    // Depth-decayed 1st-Order Wave Pitch Moment on Slender Spar
     const omega_wave = (2 * Math.PI) / Math.max(1.0, Tp);
     const k_wave = (omega_wave ** 2) / g;
-    // Wave dynamic pressure decays as exp(-k*z) near effective action center (-45m)
     const depth_decay = Math.exp(-k_wave * 45.0);
     const M_wave = 0.5 * rho_water * g * (Math.PI * 4.7 ** 2 / 4) * (Hs / 2.0) * depth_decay * 45.0 * Math.sin(omega_wave * time) * Math.cos(waveHeadingRad);
 
-    // Coupled Equations of Motion:
-    // 1. Platform Pitch (Calibrated against OC3 Benchmark C55)
     const pitch_rad = state.pitch * Math.PI / 180.0;
     const pitch_acc = (F_thrust * Math.cos(windHeadingRad) * H_hub + M_wave - C55_total * pitch_rad - C55_damping * state.pitch_dot) / I_pitch;
     state.pitch_dot += pitch_acc * dt;
     state.pitch += (state.pitch_dot * 180.0 / Math.PI) * dt;
 
-    // 2. Platform Surge
     const surge_acc = (F_thrust * Math.cos(windHeadingRad) - K_mooring_surge * state.surge - 2.5e5 * state.surge_dot) / Mass_total;
     state.surge_dot += surge_acc * dt;
     state.surge += state.surge_dot * dt;
 
-    // 3. Elastic Tower Fore-Aft Bending Mode ODE
     const q_acc = (F_thrust - K_tower * state.q_tower - C_tower * state.q_tower_dot - Mass_rna * H_hub * pitch_acc) / (M_tower_equiv + Mass_rna);
     state.q_tower_dot += q_acc * dt;
     state.q_tower += state.q_tower_dot * dt;
@@ -440,12 +428,18 @@ function solvePhysicsSubStep(dt, V_wind, windHeadingRad, waveHeadingRad, Hs, Tp,
 }
 
 // =========================================================================
-// 8. PLOTLY TIME-SERIES MONITOR
+// 8. PLOTLY TIME-SERIES MONITOR (10 HZ THROTTLED)
 // =========================================================================
-const timeHist = [], powerHist = [], pitchHist = [];
+const MAX_PLOT_POINTS = 600;
+const timeHist = new Array(MAX_PLOT_POINTS).fill(0);
+const powerHist = new Array(MAX_PLOT_POINTS).fill(0);
+const pitchHist = new Array(MAX_PLOT_POINTS).fill(0);
+let plotIndex = 0;
+let lastPlotTime = 0.0;
+
 function initPlot() {
     const traceP = { x: timeHist, y: powerHist, name: 'Power (MW)', line: { color: '#22c55e', width: 2 } };
-    const tracePitch = { x: timeHist, y: pitchHist, name: 'Pitch (deg)', line: { color: '#eab308', width: 2 }, yaxis: 'y2' };
+    const tracePitch = { x: timeHist, y: pitchHist, name: 'Platform Pitch (deg)', line: { color: '#eab308', width: 2 }, yaxis: 'y2' };
 
     const layout = {
         margin: { t: 25, b: 35, l: 45, r: 45 },
@@ -454,8 +448,8 @@ function initPlot() {
         showlegend: true,
         legend: { font: { color: '#f8fafc' }, x: 0.05, y: 1.15, orientation: 'h' },
         xaxis: { title: 'Time (s)', tickfont: { color: '#f8fafc' }, gridcolor: '#334155' },
-        yaxis: { title: 'Power (MW)', tickfont: { color: '#22c55e' }, gridcolor: '#334155' },
-        yaxis2: { title: 'Platform Pitch (deg)', tickfont: { color: '#eab308' }, overlaying: 'y', side: 'right' },
+        yaxis: { title: 'Power (MW)', tickfont: { color: '#22c55e' }, gridcolor: '#334155', range: [0, 6] },
+        yaxis2: { title: 'Platform Pitch (deg)', tickfont: { color: '#eab308' }, overlaying: 'y', side: 'right', range: [-8, 8] },
         height: 250
     };
     Plotly.newPlot('plot-container', [traceP, tracePitch], layout, { responsive: true });
@@ -480,7 +474,6 @@ function animate() {
     controls.update();
 
     let frameDelta = clock.getDelta();
-    // Tab throttling guard: clamp delta to prevent numerical explosions when switching tabs
     if (frameDelta > 0.1) frameDelta = 0.02;
 
     const V_wind = parseFloat(document.getElementById('slider-wind').value);
@@ -507,14 +500,14 @@ function animate() {
             physicsAccumulator -= FIXED_DT;
         }
 
-        // Rotate Rotor Blades
+        // Rotor Blades
         rotorAngle += state.omega_rotor * frameDelta;
         hubGroup.rotation.x = rotorAngle;
 
-        // Apply Blade Pitch Articulation
+        // Blade Pitch Articulation
         blades.forEach(b => { b.children[0].rotation.y = state.blade_pitch_rad; });
 
-        // Update Platform Position & Rotations
+        // Platform Motions
         fowtGroup.position.x = state.surge;
         fowtGroup.rotation.z = -state.pitch * Math.PI / 180.0;
 
@@ -524,7 +517,7 @@ function animate() {
         // Graphics Updates
         updateCatenary(depth);
         updateWake(res.C_T, V_wind);
-        updateOcean(simTime, Hs, Tp, spreadingS, waveRad);
+        updateOcean(simTime, Hs, Tp, spreadingS, waveRad, depth);
 
         // Dashboard Readouts
         const power_MW = Math.min(5.0, res.P_aero / 1e6);
@@ -538,12 +531,19 @@ function animate() {
         document.getElementById('overlay-flex').innerText = state.q_tower.toFixed(2) + ' m';
         document.getElementById('overlay-misalign').innerText = Math.abs(windHeadingDeg - waveHeadingDeg).toFixed(0) + '°';
 
-        // Time Series Plot (rolling 1,200 points ≈ 120s)
-        if (timeHist.length > 1200) { timeHist.shift(); powerHist.shift(); pitchHist.shift(); }
-        timeHist.push(simTime.toFixed(1));
-        powerHist.push(power_MW);
-        pitchHist.push(state.pitch);
-        Plotly.update('plot-container', { x: [timeHist, timeHist], y: [powerHist, pitchHist] });
+        // Throttled Plotly Updates (~10 Hz)
+        if (simTime - lastPlotTime >= 0.1) {
+            lastPlotTime = simTime;
+            timeHist.shift();
+            powerHist.shift();
+            pitchHist.shift();
+
+            timeHist.push(simTime.toFixed(1));
+            powerHist.push(power_MW);
+            pitchHist.push(state.pitch);
+
+            Plotly.update('plot-container', { x: [timeHist, timeHist], y: [powerHist, pitchHist] });
+        }
     }
 
     renderer.render(scene, camera);
@@ -559,7 +559,7 @@ function updateUI() {
     const isEquilibrium = document.getElementById('check-equilibrium').checked;
 
     if (isEquilibrium) {
-        // Pierson-Moskowitz fully-developed sea equilibrium
+        // Pierson-Moskowitz equilibrium formulation
         const Hs_eq = (0.0246 * Math.pow(V, 2)).toFixed(1);
         const Tp_eq = (0.714 * V).toFixed(1);
 
