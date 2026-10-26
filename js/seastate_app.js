@@ -19,7 +19,7 @@ function solveWaveNumber(omega, depth) {
 }
 
 // =========================================================================
-// 2. THREE.JS SCENE, SKYBOX & LIGHTING
+// 2. THREE.JS SCENE, SKYBOX & LIGHTING SETUP
 // =========================================================================
 const container = document.getElementById('canvas3d');
 const scene = new THREE.Scene();
@@ -41,13 +41,13 @@ controls.maxPolarAngle = Math.PI * 0.495;
 controls.minDistance = 8;
 controls.maxDistance = 1200;
 
-// Lighting
+// Maritime Directional Sunlight + Ambient Fill
 const sunLight = new THREE.DirectionalLight(0xfff6e5, 3.0);
 sunLight.position.set(-600, 350, 450);
 scene.add(sunLight);
 scene.add(new THREE.AmbientLight(0x64748b, 0.75));
 
-// Fallback procedural skybox
+// Fallback Procedural Skybox
 function buildSkybox() {
     const cubeMap = new THREE.CubeTexture([]);
     const size = 512;
@@ -85,7 +85,6 @@ scene.background = fallbackSky;
 // =========================================================================
 const textureLoader = new THREE.TextureLoader();
 
-// Sky panorama
 textureLoader.load('textures/sky.jpg', function(tex) {
     tex.mapping = THREE.EquirectangularReflectionMapping;
     scene.background = tex;
@@ -93,14 +92,13 @@ textureLoader.load('textures/sky.jpg', function(tex) {
     waterMat.needsUpdate = true;
 });
 
-// Water normals (native Three.js material path)
 let waterNormalTex = null;
 textureLoader.load('textures/waternormals.jpg', function(tex) {
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(8.5, 8.5); // Looser scale so waves don't look like small tight tiles
+    tex.repeat.set(8.5, 8.5);
     waterNormalTex = tex;
     waterMat.normalMap = waterNormalTex;
-    waterMat.normalScale = new THREE.Vector2(0.06, 0.06);
+    waterMat.normalScale = new THREE.Vector2(0.05, 0.05);
     waterMat.needsUpdate = true;
 });
 
@@ -108,14 +106,14 @@ textureLoader.load('textures/waternormals.jpg', function(tex) {
 // 4. COMPUTATIONAL WAVE BASIN GEOMETRY
 // =========================================================================
 const baseDim = 900;
-const oceanSegs = 120; // 14,400 vertices = locked 60 FPS
+const oceanSegs = 120; // 14,641 vertices for high-fidelity Creamer crest resolution
 
 // Seabed mesh
 const seabedGeom = new THREE.PlaneGeometry(baseDim, baseDim, 16, 16);
 seabedGeom.rotateX(-Math.PI / 2);
 const seabedMat = new THREE.MeshStandardMaterial({
-    color: 0x141210,      // Natural dark abyssal / silt tone
-    roughness: 0.96,      // Matte diffuse scatter eliminates harsh tile highlights
+    color: 0x141210,
+    roughness: 0.96,
     metalness: 0.0
 });
 const seabedMesh = new THREE.Mesh(seabedGeom, seabedMat);
@@ -128,15 +126,28 @@ const mastMesh = new THREE.Mesh(
 );
 scene.add(mastMesh);
 
-// Water mesh
+// Water mesh with Dynamic Vertex Colors for Breaking Crest Foam
 const waterGeom = new THREE.PlaneGeometry(baseDim, baseDim, oceanSegs, oceanSegs);
 waterGeom.rotateX(-Math.PI / 2);
 
+const vertCount = waterGeom.attributes.position.count;
+const vertexColors = new Float32Array(vertCount * 3);
+waterGeom.setAttribute('color', new THREE.BufferAttribute(vertexColors, 3));
+
+// Cache resting reference coordinates (x0, z0) for Lagrangian mapping
+const restX = new Float32Array(vertCount);
+const restZ = new Float32Array(vertCount);
+for (let i = 0; i < vertCount; i++) {
+    restX[i] = waterGeom.attributes.position.getX(i);
+    restZ[i] = waterGeom.attributes.position.getZ(i);
+}
+
 const waterMat = new THREE.MeshStandardMaterial({
-    color: 0x091c2b,          // Deep North Atlantic slate navy
+    color: 0x091c2b,
     roughness: 0.12,
     metalness: 0.10,
     envMap: fallbackSky,
+    vertexColors: true,
     transparent: true,
     opacity: 0.94,
     side: THREE.DoubleSide
@@ -172,7 +183,7 @@ buoyGroup.add(beacon);
 scene.add(buoyGroup);
 
 // =========================================================================
-// 6. PHYSICAL SPECTRAL SYNTHESIS (Monte Carlo Seeds)
+// 6. PHYSICAL SPECTRAL SYNTHESIS (Creamer Nonlinear Formulation)
 // =========================================================================
 const NUM_COMPS = 32;
 const waveComps = [];
@@ -199,13 +210,9 @@ function getSpectralWeight(freqFactor, gamma) {
 function updateSeaState(time, Hs, Tp, gamma, spreadingS, headingRad, depth, meshScale) {
     const pos = waterGeom.attributes.position;
     const normals = waterGeom.attributes.normal;
+    const colors = waterGeom.attributes.color;
 
     const omega_p = (2.0 * Math.PI) / Math.max(1.0, Tp);
-    const kp_main = solveWaveNumber(omega_p, depth);
-
-    let probeEta = 0.0;
-    let probeSlopeX = 0.0;
-    let probeSlopeZ = 0.0;
 
     let sumWeight = 0.0;
     for (let c = 0; c < NUM_COMPS; c++) {
@@ -228,43 +235,100 @@ function updateSeaState(time, Hs, Tp, gamma, spreadingS, headingRad, depth, mesh
         const normAmp = Math.sqrt(getSpectralWeight(comp.freqFactor, gamma) / sumWeight) * dirWeight;
         const amp = (Hs * 0.5) * normAmp * 0.72;
 
+        const cosTh = Math.cos(theta);
+        const sinTh = Math.sin(theta);
+        const kx = k * cosTh;
+        const kz = k * sinTh;
+
+        // Finite-depth kinematic elongation factor: coth(kd)
+        const coth_kd = 1.0 / Math.tanh(Math.min(10.0, k * depth));
+
         activeWaves.push({
-            kx: k * Math.cos(theta),
-            kz: k * Math.sin(theta),
+            kx: kx,
+            kz: kz,
+            k: k,
+            // Directional unit vectors for horizontal Hilbert transform
+            ux: cosTh,
+            uz: sinTh,
             amp: amp,
+            coth_kd: coth_kd,
             phase: comp.phase - omega * time
         });
     }
 
-    const count = pos.count;
-    const midIdx = Math.floor(count * 0.5);
+    let probeEta = 0.0;
+    let probeDx = 0.0;
+    let probeDz = 0.0;
+    let probeSlopeX = 0.0;
+    let probeSlopeZ = 0.0;
 
-    for (let i = 0; i < count; i++) {
-        const x = pos.getX(i) * meshScale;
-        const z = pos.getZ(i) * meshScale;
+    const midIdx = Math.floor(vertCount * 0.5);
+
+    // Creamer parameter (choppiness factor, 0 = pure linear, 1.0 = full Creamer)
+    const lambda_c = 1.0;
+
+    for (let i = 0; i < vertCount; i++) {
+        const x0 = restX[i] * meshScale;
+        const z0 = restZ[i] * meshScale;
 
         let eta = 0.0;
+        let dx = 0.0;
+        let dz = 0.0;
+        let dxi_dx = 0.0;
+        let dxi_dz = 0.0;
         let grad_x = 0.0;
         let grad_z = 0.0;
 
         for (let c = 0; c < NUM_COMPS; c++) {
             const w = activeWaves[c];
-            const p = w.kx * x + w.kz * z + w.phase;
+            const p = w.kx * x0 + w.kz * z0 + w.phase;
             const cosP = Math.cos(p);
             const sinP = Math.sin(p);
 
+            // Vertical Elevation (Real Fourier component)
             eta += w.amp * cosP;
+
+            // Horizontal Lagrangian shift (Hilbert Transform: -sin(p))
+            const dH = -w.amp * sinP * w.coth_kd;
+            dx += w.ux * dH;
+            dz += w.uz * dH;
+
+            // Jacobian Spatial Derivatives
+            const dH_prime = -w.amp * cosP * w.coth_kd;
+            dxi_dx += w.ux * w.kx * dH_prime;
+            dxi_dz += w.uz * w.kz * dH_prime;
+
+            // Linear Slope Tensor
             const slope = -w.amp * sinP;
             grad_x += slope * w.kx;
             grad_z += slope * w.kz;
         }
 
-        // Stokes crest-peaking perturbation
-        const crestPeaking = 0.5 * kp_main * (eta * Math.abs(eta));
-        eta += crestPeaking;
+        // Horizontal coordinate update (Pulls mesh vertices toward crests)
+        const finalX = restX[i] + (dx * lambda_c) / meshScale;
+        const finalZ = restZ[i] + (dz * lambda_c) / meshScale;
 
+        pos.setX(i, finalX);
         pos.setY(i, eta);
+        pos.setZ(i, finalZ);
 
+        // Creamer Jacobian: J = (1 + lambda * dxi_dx) * (1 + lambda * dxi_dz)
+        // J <= 0 represents wave overturning / crossing particle paths (breaking whitecaps)
+        const Jxx = 1.0 + lambda_c * dxi_dx;
+        const Jzz = 1.0 + lambda_c * dxi_dz;
+        const jacobian = Jxx * Jzz;
+
+        // Dynamic Crest Whitecap Painting
+        if (jacobian < 0.25 && eta > 0.3 * Hs) {
+            // Whitecap foam on breaking crests
+            const foamIntensity = Math.min(1.0, (0.25 - jacobian) * 3.5);
+            colors.setXYZ(i, 0.09 + 0.91 * foamIntensity, 0.28 + 0.72 * foamIntensity, 0.43 + 0.57 * foamIntensity);
+        } else {
+            // Deep North Atlantic slate navy
+            colors.setXYZ(i, 0.05, 0.16, 0.26);
+        }
+
+        // Normals with Jacobian steepening
         const nx = -grad_x;
         const nz = -grad_z;
         const invLen = 1.0 / Math.sqrt(nx * nx + 1.0 + nz * nz);
@@ -272,6 +336,8 @@ function updateSeaState(time, Hs, Tp, gamma, spreadingS, headingRad, depth, mesh
 
         if (i === midIdx) {
             probeEta = eta;
+            probeDx = dx;
+            probeDz = dz;
             probeSlopeX = grad_x;
             probeSlopeZ = grad_z;
         }
@@ -279,8 +345,9 @@ function updateSeaState(time, Hs, Tp, gamma, spreadingS, headingRad, depth, mesh
 
     pos.needsUpdate = true;
     normals.needsUpdate = true;
+    colors.needsUpdate = true;
 
-    return { probeEta, probeSlopeX, probeSlopeZ };
+    return { probeEta, probeDx, probeDz, probeSlopeX, probeSlopeZ };
 }
 
 // =========================================================================
@@ -314,7 +381,7 @@ function initPlot() {
 initPlot();
 
 // =========================================================================
-// 8. ANIMATION LOOP
+// 8. REAL-TIME 60 FPS ANIMATION LOOP
 // =========================================================================
 const clock = new THREE.Clock();
 let simTime = 0.0;
@@ -347,11 +414,11 @@ function animate() {
     const lambda_p = (2.0 * Math.PI) / kp;
     const cp = lambda_p / Tp;
 
-    // Both engineering steepness and dynamic ka steepness
+    // Engineering steepness & dynamic ka
     const steepnessEng = Hs / lambda_p;
     const steepnessKa = 0.5 * kp * Hs;
 
-    // Dynamic wave tank scaling: maintain 15-20 vertices per peak wavelength
+    // Dynamic wave tank scaling: maintain ~15-20 vertices per peak wavelength
     const targetDim = Math.min(1100, Math.max(340, lambda_p * 6.0));
     const meshScale = targetDim / baseDim;
 
@@ -365,7 +432,7 @@ function animate() {
     if (!isSimulationPaused) {
         simTime += dt;
 
-        // Gentle micro-glint ripple advection
+        // Capillary ripple advection along sea heading
         if (waterNormalTex) {
             const advectSpeed = 0.003;
             waterNormalTex.offset.x = (simTime * advectSpeed * Math.cos(headingRad)) % 1.0;
@@ -374,7 +441,8 @@ function animate() {
 
         const res = updateSeaState(simTime, Hs, Tp, gamma, spreadingS, headingRad, depth, meshScale);
 
-        buoyGroup.position.set(0, res.probeEta + 0.3, 0);
+        // Waverider Buoy follows full 3D Lagrangian closed orbital path
+        buoyGroup.position.set(res.probeDx, res.probeEta + 0.3, res.probeDz);
         buoyGroup.rotation.z = -Math.atan(res.probeSlopeX);
         buoyGroup.rotation.x = Math.atan(res.probeSlopeZ);
 
@@ -404,7 +472,7 @@ function animate() {
 animate();
 
 // =========================================================================
-// 9. CLEAN UI LISTENERS
+// 9. CLEAN UI EVENT LISTENERS
 // =========================================================================
 function updateUI() {
     const Hs = document.getElementById('slider-hs').value;
