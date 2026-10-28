@@ -317,7 +317,7 @@ function updateSeaState(time, Hs, Tp, gamma, spreadingS, headingRad, depth, mesh
 }
 
 // =========================================================================
-// 7. LIVE PLOTLY MONITOR
+// 7. LIVE PLOTLY MONITOR (3D Tank Surface Probe η(t))
 // =========================================================================
 const maxPoints = 250;
 const timeHist = new Array(maxPoints).fill(0);
@@ -422,6 +422,7 @@ function animate() {
     const headingDeg = parseFloat(document.getElementById('slider-heading').value);
     const spreadingS = parseInt(document.getElementById('slider-spread').value);
     const depth = parseFloat(document.getElementById('slider-depth').value);
+    const maxDepth = parseFloat(document.getElementById('slider-depth').max) || 400;
 
     const headingRad = (headingDeg * Math.PI) / 180.0;
 
@@ -439,9 +440,16 @@ function animate() {
     waterMesh.scale.set(meshScale, 1.0, meshScale);
     seabedMesh.scale.set(meshScale, 1.0, meshScale);
 
-    seabedMesh.position.y = -depth;
-    mastMesh.position.set(0, -depth / 2, 0);
-    mastMesh.scale.set(1.0, depth / 100.0, 1.0);
+    // Deep water regime: hide visual floor when at the deep ocean threshold
+    const showSeabed = depth < maxDepth;
+    seabedMesh.visible = showSeabed;
+    mastMesh.visible = showSeabed;
+
+    if (showSeabed) {
+        seabedMesh.position.y = -depth;
+        mastMesh.position.set(0, -depth / 2, 0);
+        mastMesh.scale.set(1.0, depth / 100.0, 1.0);
+    }
 
     if (!isSimulationPaused) {
         simTime += dt;
@@ -492,14 +500,20 @@ function updateUI() {
     const gamma = parseFloat(document.getElementById('slider-gamma').value);
     const heading = document.getElementById('slider-heading').value;
     const sVal = parseInt(document.getElementById('slider-spread').value);
-    const depth = document.getElementById('slider-depth').value;
+    const depthVal = parseFloat(document.getElementById('slider-depth').value);
+    const maxDepth = parseFloat(document.getElementById('slider-depth').max) || 400;
 
     document.getElementById('val-hs').innerText = Hs + ' m';
     document.getElementById('val-tp').innerText = Tp + ' s';
     document.getElementById('val-gamma').innerText = (gamma === 1.0) ? 'γ = 1.0 (PM)' : 'γ = ' + gamma.toFixed(1);
     document.getElementById('val-heading').innerText = heading + '°';
     document.getElementById('val-spread').innerText = (sVal === 0) ? 's = 0 (Uni)' : 's = ' + sVal;
-    document.getElementById('val-depth').innerText = depth + ' m';
+
+    if (depthVal >= maxDepth) {
+        document.getElementById('val-depth').innerText = `${maxDepth} m (Deep Water ∞)`;
+    } else {
+        document.getElementById('val-depth').innerText = depthVal.toFixed(0) + ' m';
+    }
 }
 
 [
@@ -517,7 +531,7 @@ window.addEventListener('resize', () => {
 });
 
 // =========================================================================
-// 11. MAP PICKER & NOAA BATHYMETRY MODULE
+// 11. MAP PICKER, NOAA BATHYMETRY & TIMELINE SPARKLINE MODULE
 // =========================================================================
 let map = null;
 let pinMarker = null;
@@ -525,9 +539,16 @@ let currentPinLat = 56.0, currentPinLon = -20.0;
 let cachedTimeSeries = null;
 
 function initMap() {
-    if (map) return;
+    const mapEl = document.getElementById('leaflet-map');
+    if (!mapEl) return;
+
+    if (map) {
+        map.invalidateSize();
+        return;
+    }
+
     map = L.map('leaflet-map', {
-        center: [35.0, -20.0],
+        center: [currentPinLat, currentPinLon],
         zoom: 2,
         minZoom: 1,
         maxZoom: 11,
@@ -558,7 +579,7 @@ async function fetchOceanDepth(lat, lon) {
     const x = parseFloat(lon.toFixed(4));
     const y = parseFloat(lat.toFixed(4));
 
-    // 1. Primary: NOAA DEM Global Mosaic (High resolution global bathymetry)
+    // 1. Primary: NOAA DEM Global Mosaic
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4500);
@@ -573,8 +594,8 @@ async function fetchOceanDepth(lat, lon) {
             if (data && data.value !== undefined && data.value !== "" && data.value !== "NoData") {
                 const elev = parseFloat(data.value);
                 if (!isNaN(elev)) {
-                    if (elev < 0) return Math.abs(elev); // Depth in meters beneath sea surface
-                    if (elev === 0) return 20.0;        // Intertidal / coast
+                    if (elev < 0) return Math.abs(elev); // Depth beneath sea surface
+                    if (elev === 0) return 20.0;        // Intertidal
                     return 12.0;                        // Shallow edge
                 }
             }
@@ -610,6 +631,100 @@ async function fetchOceanDepth(lat, lon) {
 
     // 3. Last-resort default
     return 75.0;
+}
+
+// Render the 168-hour Significant Wave Height (Hs) series (Fixed-range, No-Zoom)
+function renderPickerSparkline(timeArr, hsArr, activeIdx) {
+    const placeholder = document.getElementById('picker-plot-placeholder');
+    if (placeholder) placeholder.style.display = 'none';
+
+    const plotEl = document.getElementById('picker-plot');
+    if (!plotEl) return;
+
+    const cleanTimes = timeArr.map(t => t.replace('T', ' ').slice(5));
+
+    const traceHs = {
+        x: cleanTimes,
+        y: hsArr,
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Hs (m)',
+        line: { color: '#38bdf8', width: 2 },
+        fill: 'tozeroy',
+        fillcolor: 'rgba(56, 189, 248, 0.15)',
+        hoverinfo: 'x+y'
+    };
+
+    const validHs = hsArr.filter(v => v !== null && !isNaN(v));
+    const maxVal = validHs.length > 0 ? Math.max(...validHs) : 4.0;
+    const yCap = Math.max(2.0, maxVal * 1.15);
+
+    const cursorLine = {
+        type: 'line',
+        x0: cleanTimes[activeIdx],
+        x1: cleanTimes[activeIdx],
+        y0: 0,
+        y1: yCap,
+        line: { color: '#f59e0b', width: 2, dash: 'dot' }
+    };
+
+    const layout = {
+        margin: { t: 6, b: 20, l: 34, r: 12 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        showlegend: false,
+        shapes: [cursorLine],
+        dragmode: false, // Prevents box-selection & click-drag zooming
+        xaxis: {
+            showgrid: true,
+            gridcolor: '#1e293b',
+            tickfont: { color: '#64748b', size: 9 },
+            nticks: 7,
+            fixedrange: true // Locks X-axis against zoom/pan
+        },
+        yaxis: {
+            title: { text: 'Hs (m)', font: { size: 9, color: '#38bdf8' } },
+            showgrid: true,
+            gridcolor: '#1e293b',
+            tickfont: { color: '#94a3b8', size: 9 },
+            range: [0, yCap],
+            fixedrange: true // Locks Y-axis against zoom/pan
+        }
+    };
+
+    const config = {
+        displayModeBar: false,
+        responsive: true,
+        scrollZoom: false,
+        doubleClick: false // Prevents double-click reset/zoom
+    };
+
+    Plotly.react(plotEl, [traceHs], layout, config).then(() => {
+        Plotly.Plots.resize(plotEl);
+    });
+
+    plotEl.removeAllListeners && plotEl.removeAllListeners('plotly_click');
+    plotEl.on('plotly_click', (data) => {
+        if (data.points && data.points.length > 0) {
+            const ptIdx = data.points[0].pointIndex;
+            document.getElementById('time-slider').value = ptIdx;
+            previewTimeIndex(ptIdx);
+        }
+    });
+}
+
+function updatePickerCursor(activeIdx) {
+    if (!cachedTimeSeries) return;
+    const cleanTime = cachedTimeSeries.time[activeIdx].replace('T', ' ').slice(5);
+    const validHs = cachedTimeSeries.hs.filter(v => v !== null && !isNaN(v));
+    const maxVal = validHs.length > 0 ? Math.max(...validHs) : 4.0;
+    const yCap = Math.max(2.0, maxVal * 1.15);
+
+    Plotly.relayout('picker-plot', {
+        'shapes[0].x0': cleanTime,
+        'shapes[0].x1': cleanTime,
+        'shapes[0].y1': yCap
+    }).catch(() => {});
 }
 
 async function fetchMetoceanData(lat, lon) {
@@ -653,7 +768,9 @@ async function fetchMetoceanData(lat, lon) {
         timeSlider.disabled = false;
         document.getElementById('btn-apply-conditions').disabled = false;
 
+        renderPickerSparkline(cachedTimeSeries.time, cachedTimeSeries.hs, 48);
         previewTimeIndex(48);
+
         document.getElementById('modal-status').innerText = `Loaded 168h series. Seafloor Depth: ${realDepth >= 1000 ? (realDepth / 1000).toFixed(1) + ' km' : realDepth.toFixed(0) + ' m'}.`;
 
     } catch (err) {
@@ -669,6 +786,8 @@ function previewTimeIndex(idx) {
 
     document.getElementById('active-time-label').innerText =
         `${rawTime.replace('T', ' ')} UTC (Hs: ${h}m, Wind: ${wind.toFixed(1)} m/s)`;
+
+    updatePickerCursor(idx);
 }
 
 document.getElementById('time-slider').addEventListener('input', (e) => {
@@ -700,8 +819,9 @@ document.getElementById('btn-apply-conditions').addEventListener('click', () => 
         calcSpread = Math.min(22, Math.round(11.5 * Math.pow(waveAge, 2.5)));
     }
 
-    // Deep water visual clamp: surface wave kinematics enter the deep-water asymptotic regime (tanh(kd) = 1.0)
-    const visualDepth = Math.min(200, Math.max(8, realDepth));
+    const maxSliderDepth = parseFloat(document.getElementById('slider-depth').max) || 400;
+    const isPelagic = realDepth >= maxSliderDepth;
+    const visualDepth = isPelagic ? maxSliderDepth : Math.max(8, realDepth);
 
     document.getElementById('slider-hs').value = Math.min(14.0, Math.max(0.5, curH)).toFixed(1);
     document.getElementById('slider-tp').value = Math.min(22.0, Math.max(4.0, curTp)).toFixed(1);
@@ -712,9 +832,11 @@ document.getElementById('btn-apply-conditions').addEventListener('click', () => 
 
     updateUI();
 
-    // Display true physical depth in telemetry
-    if (realDepth > 200) {
-        document.getElementById('val-depth').innerText = `${visualDepth.toFixed(0)} m (Pelagic: ${realDepth >= 1000 ? (realDepth / 1000).toFixed(1) + ' km' : realDepth.toFixed(0) + ' m'})`;
+    if (isPelagic) {
+        const depthStr = realDepth >= 1000 ? `${(realDepth / 1000).toFixed(1)} km` : `${realDepth.toFixed(0)} m`;
+        document.getElementById('val-depth').innerText = `${depthStr} (Deep Water ∞)`;
+    } else {
+        document.getElementById('val-depth').innerText = `${realDepth.toFixed(0)} m`;
     }
 
     updateSolarLighting(cachedTimeSeries.lat, cachedTimeSeries.lon, dateObj);
@@ -723,9 +845,19 @@ document.getElementById('btn-apply-conditions').addEventListener('click', () => 
 
 // Modal Event Listeners
 document.getElementById('btn-open-map').addEventListener('click', () => {
-    document.getElementById('map-modal').style.display = 'flex';
-    initMap();
-    setTimeout(() => { if (map) map.invalidateSize(); }, 120);
+    const modal = document.getElementById('map-modal');
+    modal.style.display = 'flex';
+
+    setTimeout(() => {
+        initMap();
+        if (map) {
+            map.invalidateSize();
+            map.setView([currentPinLat, currentPinLon], map.getZoom());
+        }
+        if (cachedTimeSeries) {
+            Plotly.Plots.resize('picker-plot');
+        }
+    }, 60);
 });
 
 document.getElementById('btn-close-modal').addEventListener('click', () => {
