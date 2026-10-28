@@ -12,6 +12,69 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+
+    <!-- Leaflet for Marine Map Picker -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        /* Lightweight styles for the Metocean Modal */
+        .btn-live {
+            background: linear-gradient(135deg, #0284c7, #0369a1);
+            color: #ffffff;
+            border: 1px solid #38bdf8;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
+        }
+        .btn-live:hover { background: linear-gradient(135deg, #0369a1, #075985); }
+
+        #map-modal {
+            display: none; position: fixed; inset: 0; z-index: 1000;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(6px);
+            align-items: center; justify-content: center;
+        }
+        #modal-card {
+            background: #0f172a; border: 1px solid #334155; border-radius: 12px;
+            width: 820px; max-width: 94vw; padding: 20px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);
+            color: #f8fafc; font-family: inherit;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .close-btn { background: none; border: none; color: #94a3b8; font-size: 22px; cursor: pointer; }
+        
+        #leaflet-map {
+            width: 100%; height: 350px; border-radius: 8px; overflow: hidden;
+            border: 1px solid #334155; background: #04101e;
+        }
+
+        #timeline-container {
+            margin-top: 14px; padding-top: 12px; border-top: 1px solid #334155;
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        #time-slider { width: 100%; accent-color: #0284c7; cursor: pointer; }
+        .time-labels { display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; }
+        #active-time-label { font-weight: 700; color: #38bdf8; font-size: 12px; }
+
+        .modal-footer {
+            display: flex; justify-content: space-between; align-items: center; margin-top: 14px;
+        }
+        .btn-apply {
+            background: #22c55e; color: #022c22; border: none; padding: 8px 18px;
+            border-radius: 6px; font-weight: 700; cursor: pointer; transition: background 0.2s;
+        }
+        .btn-apply:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+        .btn-apply:hover:not(:disabled) { background: #16a34a; color: #ffffff; }
+    </style>
 </head>
 <body>
 
@@ -26,8 +89,11 @@
             <button id="btn-pause" class="btn-action" onclick="togglePause()">⏸ Pause</button>
         </div>
 
+        <!-- Ingestion Entrypoint Button -->
+        <button id="btn-open-map" class="btn-live">🌍 Import Real Metocean Conditions</button>
+
         <!-- Live Wave Metrics -->
-        <div class="dash-grid">
+        <div class="dash-grid" style="margin-top: 12px;">
             <div class="dash-card">
                 <div class="dash-title">Peak Wavelength &lambda;<sub>p</sub></div>
                 <div id="dash-lambda" class="dash-val" style="color: #38bdf8;">156.1 m</div>
@@ -61,7 +127,7 @@
                 <span class="label-text">Wave Height <i>H</i><sub>s</sub> (m)</span>
                 <span id="val-hs" class="value-badge">3.5 m</span>
             </label>
-            <input type="range" id="slider-hs" min="0.5" max="10.0" step="0.2" value="3.5">
+            <input type="range" id="slider-hs" min="0.5" max="14.0" step="0.2" value="3.5">
         </div>
 
         <div class="control-group">
@@ -77,7 +143,7 @@
                 <span class="label-text">Peak Enhancement &gamma;</span>
                 <span id="val-gamma" class="value-badge">&gamma; = 3.3 (JONSWAP)</span>
             </label>
-            <input type="range" id="slider-gamma" min="1.0" max="7.0" step="0.2" value="3.3">
+            <input type="range" id="slider-gamma" min="1.0" max="7.0" step="0.1" value="3.3">
         </div>
 
         <div class="control-group">
@@ -93,7 +159,7 @@
                 <span class="label-text">Directional Spreading (s)</span>
                 <span id="val-spread" class="value-badge">s = 4 (Swell)</span>
             </label>
-            <input type="range" id="slider-spread" min="0" max="12" step="1" value="4">
+            <input type="range" id="slider-spread" min="0" max="25" step="1" value="4">
         </div>
 
         <div class="control-group">
@@ -101,7 +167,7 @@
                 <span class="label-text">Water Depth d (m)</span>
                 <span id="val-depth" class="value-badge">60 m</span>
             </label>
-            <input type="range" id="slider-depth" min="8" max="200" step="2" value="60">
+            <input type="range" id="slider-depth" min="8" max="400" step="2" value="60">
         </div>
 
         <div style="margin-top: 6px; font-size: 0.72rem; color: #94a3b8; line-height: 1.4;">
@@ -117,11 +183,45 @@
         <div id="status-overlay">
             Wave Probe: <span id="overlay-coords">(0, 0)</span><br>
             Spectral Components: <span id="overlay-comps">32 Waves</span><br>
-            Dispersion Regime: <span id="overlay-regime" style="color: #38bdf8;">Deep Water</span>
+            Dispersion Regime: <span id="overlay-regime" style="color: #38bdf8;">Deep Water</span><br>
+            Sun Position: <span id="overlay-sun" style="color: #eab308;">Manual Default</span>
         </div>
 
         <div id="canvas3d"></div>
         <div id="plot-container"></div>
+    </div>
+
+    <!-- Real-World Map & Time Picker Modal -->
+    <div id="map-modal">
+        <div id="modal-card">
+            <div class="modal-header">
+                <div>
+                    <span style="font-weight: 700; font-size: 16px;">Esri Ocean Bathymetry + Metocean Ingestion</span>
+                    <span style="font-size: 12px; color: #94a3b8; margin-left: 10px;">(Click anywhere on water)</span>
+                </div>
+                <button class="close-btn" id="btn-close-modal">✕</button>
+            </div>
+            
+            <div id="leaflet-map"></div>
+
+            <div id="timeline-container">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="font-size: 12px; color: #cbd5e1;">Hourly Time Scrubber:</span>
+                    <span id="active-time-label">Select a location above</span>
+                </div>
+                <input type="range" id="time-slider" min="0" max="167" value="48" disabled>
+                <div class="time-labels">
+                    <span>-48h (Hindcast)</span>
+                    <span>Current</span>
+                    <span>+120h (Forecast)</span>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <span id="modal-status" style="font-size: 12px; color: #94a3b8;">Click on any open water or shelf region.</span>
+                <button class="btn-apply" id="btn-apply-conditions" disabled>Load into Simulation</button>
+            </div>
+        </div>
     </div>
 
     <script src="js/seastate_app.js"></script>

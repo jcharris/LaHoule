@@ -41,16 +41,18 @@ controls.maxPolarAngle = Math.PI * 0.495;
 controls.minDistance = 8;
 controls.maxDistance = 1200;
 
-// Maritime Directional Sunlight + Ambient Fill
+// Directional Sunlight & Ambient Fill
 const sunLight = new THREE.DirectionalLight(0xfff6e5, 3.0);
 sunLight.position.set(-600, 350, 450);
 scene.add(sunLight);
-scene.add(new THREE.AmbientLight(0x64748b, 0.75));
+
+const ambientLight = new THREE.AmbientLight(0x64748b, 0.75);
+scene.add(ambientLight);
 
 // Fallback Procedural Skybox
 function buildSkybox() {
     const cubeMap = new THREE.CubeTexture([]);
-    const size = 512;
+    const size = 256;
     for (let i = 0; i < 6; i++) {
         const canvas = document.createElement('canvas');
         canvas.width = size; canvas.height = size;
@@ -90,7 +92,7 @@ textureLoader.load('textures/sky.jpg', function(tex) {
     scene.background = tex;
     waterMat.envMap = tex;
     waterMat.needsUpdate = true;
-});
+}, undefined, () => {});
 
 let waterNormalTex = null;
 textureLoader.load('textures/waternormals.jpg', function(tex) {
@@ -100,15 +102,16 @@ textureLoader.load('textures/waternormals.jpg', function(tex) {
     waterMat.normalMap = waterNormalTex;
     waterMat.normalScale = new THREE.Vector2(0.05, 0.05);
     waterMat.needsUpdate = true;
-});
+}, undefined, () => {});
 
 // =========================================================================
 // 4. COMPUTATIONAL WAVE BASIN GEOMETRY
 // =========================================================================
 const baseDim = 900;
-const oceanSegs = 120; // 14,641 vertices for high-fidelity Creamer crest resolution
+const isMobile = window.innerWidth < 768;
+const oceanSegs = isMobile ? 70 : 110;
 
-// Seabed mesh
+// Seabed Mesh
 const seabedGeom = new THREE.PlaneGeometry(baseDim, baseDim, 16, 16);
 seabedGeom.rotateX(-Math.PI / 2);
 const seabedMat = new THREE.MeshStandardMaterial({
@@ -126,7 +129,7 @@ const mastMesh = new THREE.Mesh(
 );
 scene.add(mastMesh);
 
-// Water mesh with Dynamic Vertex Colors for Breaking Crest Foam
+// Water mesh with Dynamic Vertex Colors
 const waterGeom = new THREE.PlaneGeometry(baseDim, baseDim, oceanSegs, oceanSegs);
 waterGeom.rotateX(-Math.PI / 2);
 
@@ -134,7 +137,6 @@ const vertCount = waterGeom.attributes.position.count;
 const vertexColors = new Float32Array(vertCount * 3);
 waterGeom.setAttribute('color', new THREE.BufferAttribute(vertexColors, 3));
 
-// Cache resting reference coordinates (x0, z0) for Lagrangian mapping
 const restX = new Float32Array(vertCount);
 const restZ = new Float32Array(vertCount);
 for (let i = 0; i < vertCount; i++) {
@@ -183,7 +185,7 @@ buoyGroup.add(beacon);
 scene.add(buoyGroup);
 
 // =========================================================================
-// 6. PHYSICAL SPECTRAL SYNTHESIS (Creamer Nonlinear Formulation)
+// 6. PHYSICAL SPECTRAL SYNTHESIS (Nonlinear Surface Formulation)
 // =========================================================================
 const NUM_COMPS = 32;
 const waveComps = [];
@@ -239,45 +241,25 @@ function updateSeaState(time, Hs, Tp, gamma, spreadingS, headingRad, depth, mesh
         const sinTh = Math.sin(theta);
         const kx = k * cosTh;
         const kz = k * sinTh;
-
-        // Finite-depth kinematic elongation factor: coth(kd)
         const coth_kd = 1.0 / Math.tanh(Math.min(10.0, k * depth));
 
         activeWaves.push({
-            kx: kx,
-            kz: kz,
-            k: k,
-            // Directional unit vectors for horizontal Hilbert transform
-            ux: cosTh,
-            uz: sinTh,
-            amp: amp,
-            coth_kd: coth_kd,
-            phase: comp.phase - omega * time
+            kx, kz, k, ux: cosTh, uz: sinTh,
+            amp, coth_kd, phase: comp.phase - omega * time
         });
     }
 
-    let probeEta = 0.0;
-    let probeDx = 0.0;
-    let probeDz = 0.0;
-    let probeSlopeX = 0.0;
-    let probeSlopeZ = 0.0;
-
+    let probeEta = 0.0, probeDx = 0.0, probeDz = 0.0;
+    let probeSlopeX = 0.0, probeSlopeZ = 0.0;
     const midIdx = Math.floor(vertCount * 0.5);
-
-    // Creamer parameter (choppiness factor, 0 = pure linear, 1.0 = full Creamer)
     const lambda_c = 1.0;
 
     for (let i = 0; i < vertCount; i++) {
         const x0 = restX[i] * meshScale;
         const z0 = restZ[i] * meshScale;
 
-        let eta = 0.0;
-        let dx = 0.0;
-        let dz = 0.0;
-        let dxi_dx = 0.0;
-        let dxi_dz = 0.0;
-        let grad_x = 0.0;
-        let grad_z = 0.0;
+        let eta = 0.0, dx = 0.0, dz = 0.0;
+        let dxi_dx = 0.0, dxi_dz = 0.0, grad_x = 0.0, grad_z = 0.0;
 
         for (let c = 0; c < NUM_COMPS; c++) {
             const w = activeWaves[c];
@@ -285,52 +267,36 @@ function updateSeaState(time, Hs, Tp, gamma, spreadingS, headingRad, depth, mesh
             const cosP = Math.cos(p);
             const sinP = Math.sin(p);
 
-            // Vertical Elevation (Real Fourier component)
             eta += w.amp * cosP;
-
-            // Horizontal Lagrangian shift (Hilbert Transform: -sin(p))
             const dH = -w.amp * sinP * w.coth_kd;
             dx += w.ux * dH;
             dz += w.uz * dH;
 
-            // Jacobian Spatial Derivatives
             const dH_prime = -w.amp * cosP * w.coth_kd;
             dxi_dx += w.ux * w.kx * dH_prime;
             dxi_dz += w.uz * w.kz * dH_prime;
 
-            // Linear Slope Tensor
             const slope = -w.amp * sinP;
             grad_x += slope * w.kx;
             grad_z += slope * w.kz;
         }
 
-        // Horizontal coordinate update (Pulls mesh vertices toward crests)
-        const finalX = restX[i] + (dx * lambda_c) / meshScale;
-        const finalZ = restZ[i] + (dz * lambda_c) / meshScale;
-
-        pos.setX(i, finalX);
+        pos.setX(i, restX[i] + (dx * lambda_c) / meshScale);
         pos.setY(i, eta);
-        pos.setZ(i, finalZ);
+        pos.setZ(i, restZ[i] + (dz * lambda_c) / meshScale);
 
-        // Creamer Jacobian: J = (1 + lambda * dxi_dx) * (1 + lambda * dxi_dz)
-        // J <= 0 represents wave overturning / crossing particle paths (breaking whitecaps)
         const Jxx = 1.0 + lambda_c * dxi_dx;
         const Jzz = 1.0 + lambda_c * dxi_dz;
         const jacobian = Jxx * Jzz;
 
-        // Dynamic Crest Whitecap Painting
         if (jacobian < 0.25 && eta > 0.3 * Hs) {
-            // Whitecap foam on breaking crests
             const foamIntensity = Math.min(1.0, (0.25 - jacobian) * 3.5);
             colors.setXYZ(i, 0.09 + 0.91 * foamIntensity, 0.28 + 0.72 * foamIntensity, 0.43 + 0.57 * foamIntensity);
         } else {
-            // Deep North Atlantic slate navy
             colors.setXYZ(i, 0.05, 0.16, 0.26);
         }
 
-        // Normals with Jacobian steepening
-        const nx = -grad_x;
-        const nz = -grad_z;
+        const nx = -grad_x, nz = -grad_z;
         const invLen = 1.0 / Math.sqrt(nx * nx + 1.0 + nz * nz);
         normals.setXYZ(i, nx * invLen, invLen, nz * invLen);
 
@@ -351,7 +317,7 @@ function updateSeaState(time, Hs, Tp, gamma, spreadingS, headingRad, depth, mesh
 }
 
 // =========================================================================
-// 7. LIVE PLOTLY MONITOR (Throttled to 10 Hz)
+// 7. LIVE PLOTLY MONITOR
 // =========================================================================
 const maxPoints = 250;
 const timeHist = new Array(maxPoints).fill(0);
@@ -381,7 +347,58 @@ function initPlot() {
 initPlot();
 
 // =========================================================================
-// 8. REAL-TIME 60 FPS ANIMATION LOOP
+// 8. SOLAR EPHEMERIS CALCULATOR
+// =========================================================================
+function updateSolarLighting(latDeg, lonDeg, dateObj) {
+    const rad = Math.PI / 180.0;
+    const lat = latDeg * rad;
+
+    const startOfYear = new Date(Date.UTC(dateObj.getUTCFullYear(), 0, 1));
+    const dayOfYear = Math.floor((dateObj - startOfYear) / 86400000) + 1;
+
+    const delta = 23.45 * Math.sin((360 / 365) * (dayOfYear - 81) * rad) * rad;
+    const B = (360 / 364) * (dayOfYear - 81) * rad;
+    const EoT = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);
+
+    const utcHours = dateObj.getUTCHours() + dateObj.getUTCMinutes() / 60.0;
+    const solarTimeHours = (utcHours + lonDeg / 15.0 + EoT / 60.0 + 24.0) % 24.0;
+    const hourAngle = (solarTimeHours - 12.0) * 15.0 * rad;
+
+    const sinElevation = Math.sin(lat) * Math.sin(delta) + Math.cos(lat) * Math.cos(delta) * Math.cos(hourAngle);
+    const elevation = Math.asin(Math.max(-1.0, Math.min(1.0, sinElevation)));
+
+    const cosAzimuth = (Math.sin(delta) * Math.cos(lat) - Math.cos(delta) * Math.sin(lat) * Math.cos(hourAngle)) / Math.cos(elevation);
+    let azimuth = Math.acos(Math.max(-1.0, Math.min(1.0, cosAzimuth)));
+    if (Math.sin(hourAngle) > 0) azimuth = 2 * Math.PI - azimuth;
+
+    const elevDeg = elevation / rad;
+    const azDeg = azimuth / rad;
+
+    const r = 800.0;
+    const sunX = r * Math.sin(azimuth) * Math.cos(Math.max(0.08, elevation));
+    const sunY = r * Math.sin(Math.max(0.08, elevation));
+    const sunZ = -r * Math.cos(azimuth) * Math.cos(Math.max(0.08, elevation));
+
+    sunLight.position.set(sunX, sunY, sunZ);
+
+    if (elevDeg > 0) {
+        sunLight.intensity = 0.8 + 2.4 * Math.sin(elevation);
+        sunLight.color.set(elevDeg < 10 ? 0xffaa55 : 0xfff6e5);
+        ambientLight.intensity = 0.5 + 0.35 * Math.sin(elevation);
+    } else {
+        sunLight.intensity = 0.35;
+        sunLight.color.set(0x38bdf8);
+        ambientLight.intensity = 0.35;
+    }
+
+    const sunLabel = document.getElementById('overlay-sun');
+    if (sunLabel) {
+        sunLabel.innerText = `${azDeg.toFixed(0)}° / ${elevDeg.toFixed(1)}° (${elevDeg > 0 ? 'Day' : 'Night/Moon'})`;
+    }
+}
+
+// =========================================================================
+// 9. ANIMATION LOOP
 // =========================================================================
 const clock = new THREE.Clock();
 let simTime = 0.0;
@@ -408,17 +425,14 @@ function animate() {
 
     const headingRad = (headingDeg * Math.PI) / 180.0;
 
-    // Physical metrics
     const omega_p = (2.0 * Math.PI) / Tp;
     const kp = solveWaveNumber(omega_p, depth);
     const lambda_p = (2.0 * Math.PI) / kp;
     const cp = lambda_p / Tp;
 
-    // Engineering steepness & dynamic ka
     const steepnessEng = Hs / lambda_p;
     const steepnessKa = 0.5 * kp * Hs;
 
-    // Dynamic wave tank scaling: maintain ~15-20 vertices per peak wavelength
     const targetDim = Math.min(1100, Math.max(340, lambda_p * 6.0));
     const meshScale = targetDim / baseDim;
 
@@ -432,7 +446,6 @@ function animate() {
     if (!isSimulationPaused) {
         simTime += dt;
 
-        // Capillary ripple advection along sea heading
         if (waterNormalTex) {
             const advectSpeed = 0.003;
             waterNormalTex.offset.x = (simTime * advectSpeed * Math.cos(headingRad)) % 1.0;
@@ -441,7 +454,6 @@ function animate() {
 
         const res = updateSeaState(simTime, Hs, Tp, gamma, spreadingS, headingRad, depth, meshScale);
 
-        // Waverider Buoy follows full 3D Lagrangian closed orbital path
         buoyGroup.position.set(res.probeDx, res.probeEta + 0.3, res.probeDz);
         buoyGroup.rotation.z = -Math.atan(res.probeSlopeX);
         buoyGroup.rotation.x = Math.atan(res.probeSlopeZ);
@@ -472,7 +484,7 @@ function animate() {
 animate();
 
 // =========================================================================
-// 9. CLEAN UI EVENT LISTENERS
+// 10. UI UPDATERS
 // =========================================================================
 function updateUI() {
     const Hs = document.getElementById('slider-hs').value;
@@ -502,4 +514,220 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
     renderer.setSize(container.clientWidth, container.clientHeight);
     Plotly.Plots.resize('plot-container');
+});
+
+// =========================================================================
+// 11. MAP PICKER & NOAA BATHYMETRY MODULE
+// =========================================================================
+let map = null;
+let pinMarker = null;
+let currentPinLat = 56.0, currentPinLon = -20.0;
+let cachedTimeSeries = null;
+
+function initMap() {
+    if (map) return;
+    map = L.map('leaflet-map', {
+        center: [35.0, -20.0],
+        zoom: 2,
+        minZoom: 1,
+        maxZoom: 11,
+        worldCopyJump: true
+    });
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri, GEBCO, NOAA',
+        maxZoom: 13
+    }).addTo(map);
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 13
+    }).addTo(map);
+
+    pinMarker = L.marker([currentPinLat, currentPinLon]).addTo(map);
+
+    map.on('click', (e) => {
+        currentPinLat = e.latlng.lat;
+        currentPinLon = e.latlng.lng;
+        pinMarker.setLatLng(e.latlng);
+        fetchMetoceanData(currentPinLat, currentPinLon);
+    });
+}
+
+// Authoritative NOAA NCEI Global Bathymetry Identify Query (EPSG:4326)
+async function fetchOceanDepth(lat, lon) {
+    const x = parseFloat(lon.toFixed(4));
+    const y = parseFloat(lat.toFixed(4));
+
+    // 1. Primary: NOAA DEM Global Mosaic (High resolution global bathymetry)
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+        const url = `https://gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/DEM_global_mosaic/ImageServer/identify?geometry=${x},${y}&geometryType=esriGeometryPoint&spatialReference=%7B%22wkid%22%3A4326%7D&returnGeometry=false&f=json`;
+
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.value !== undefined && data.value !== "" && data.value !== "NoData") {
+                const elev = parseFloat(data.value);
+                if (!isNaN(elev)) {
+                    if (elev < 0) return Math.abs(elev); // Depth in meters beneath sea surface
+                    if (elev === 0) return 20.0;        // Intertidal / coast
+                    return 12.0;                        // Shallow edge
+                }
+            }
+        }
+    } catch (err) {
+        console.warn("NOAA DEM_global_mosaic lookup failed, trying ETOPO1...", err);
+    }
+
+    // 2. Secondary: NOAA ETOPO1 Bedrock Mosaic fallback
+    try {
+        const controller2 = new AbortController();
+        const timeoutId2 = setTimeout(() => controller2.abort(), 4000);
+
+        const url2 = `https://gis.ngdc.noaa.gov/arcgis/rest/services/DEM_mosaics/ETOPO1_bedrock/ImageServer/identify?geometry=${x},${y}&geometryType=esriGeometryPoint&spatialReference=%7B%22wkid%22%3A4326%7D&returnGeometry=false&f=json`;
+
+        const res2 = await fetch(url2, { signal: controller2.signal });
+        clearTimeout(timeoutId2);
+
+        if (res2.ok) {
+            const data2 = await res2.json();
+            if (data2 && data2.value !== undefined && data2.value !== "" && data2.value !== "NoData") {
+                const elev2 = parseFloat(data2.value);
+                if (!isNaN(elev2)) {
+                    if (elev2 < 0) return Math.abs(elev2);
+                    if (elev2 === 0) return 20.0;
+                    return 12.0;
+                }
+            }
+        }
+    } catch (err2) {
+        console.warn("NOAA ETOPO1 fallback unavailable:", err2);
+    }
+
+    // 3. Last-resort default
+    return 75.0;
+}
+
+async function fetchMetoceanData(lat, lon) {
+    const latStr = Math.abs(lat).toFixed(1) + (lat >= 0 ? '° N' : '° S');
+    const lonStr = Math.abs(lon).toFixed(1) + (lon >= 0 ? '° E' : '° W');
+    document.getElementById('modal-status').innerText = `Querying Copernicus & NOAA Bathymetry for [${latStr}, ${lonStr}]...`;
+    document.getElementById('btn-apply-conditions').disabled = true;
+    const timeSlider = document.getElementById('time-slider');
+    timeSlider.disabled = true;
+
+    try {
+        const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&hourly=wave_height,wave_direction,wave_period&past_days=2&forecast_days=5`;
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&hourly=wind_speed_10m&past_days=2&forecast_days=5`;
+
+        const [marineRes, weatherRes, realDepth] = await Promise.all([
+            fetch(marineUrl),
+            fetch(weatherUrl),
+            fetchOceanDepth(lat, lon)
+        ]);
+
+        const mData = await marineRes.json();
+        const wData = await weatherRes.json();
+
+        if (!mData.hourly || !mData.hourly.wave_height || mData.hourly.wave_height[48] === null) {
+            throw new Error("Selected point is on land or outside active wave grid.");
+        }
+
+        cachedTimeSeries = {
+            lat: lat,
+            lon: lon,
+            depth: realDepth,
+            time: mData.hourly.time,
+            hs: mData.hourly.wave_height,
+            tp: mData.hourly.wave_period,
+            dir: mData.hourly.wave_direction,
+            wind: wData.hourly.wind_speed_10m
+        };
+
+        timeSlider.max = cachedTimeSeries.time.length - 1;
+        timeSlider.value = 48; // Current hour
+        timeSlider.disabled = false;
+        document.getElementById('btn-apply-conditions').disabled = false;
+
+        previewTimeIndex(48);
+        document.getElementById('modal-status').innerText = `Loaded 168h series. Seafloor Depth: ${realDepth >= 1000 ? (realDepth / 1000).toFixed(1) + ' km' : realDepth.toFixed(0) + ' m'}.`;
+
+    } catch (err) {
+        document.getElementById('modal-status').innerText = `Notice: ${err.message}`;
+    }
+}
+
+function previewTimeIndex(idx) {
+    if (!cachedTimeSeries) return;
+    const rawTime = cachedTimeSeries.time[idx];
+    const h = cachedTimeSeries.hs[idx] !== null ? cachedTimeSeries.hs[idx] : 1.2;
+    const wind = (cachedTimeSeries.wind[idx] || 25.0) / 3.6;
+
+    document.getElementById('active-time-label').innerText =
+        `${rawTime.replace('T', ' ')} UTC (Hs: ${h}m, Wind: ${wind.toFixed(1)} m/s)`;
+}
+
+document.getElementById('time-slider').addEventListener('input', (e) => {
+    previewTimeIndex(parseInt(e.target.value));
+});
+
+document.getElementById('btn-apply-conditions').addEventListener('click', () => {
+    if (!cachedTimeSeries) return;
+    const idx = parseInt(document.getElementById('time-slider').value);
+
+    const curH = cachedTimeSeries.hs[idx] !== null ? cachedTimeSeries.hs[idx] : 1.5;
+    const curTp = cachedTimeSeries.tp[idx] !== null ? cachedTimeSeries.tp[idx] : 7.0;
+    const curDir = cachedTimeSeries.dir[idx] !== null ? cachedTimeSeries.dir[idx] : 240;
+    const curWind = (cachedTimeSeries.wind[idx] || 25.0) / 3.6;
+    const realDepth = cachedTimeSeries.depth;
+    const dateObj = new Date(cachedTimeSeries.time[idx] + ":00Z");
+
+    const Cp = (g * curTp) / (2.0 * Math.PI);
+    const waveAge = Cp / Math.max(1.0, curWind);
+
+    let calcGamma = 3.3;
+    let calcSpread = 4;
+
+    if (waveAge < 0.85) {
+        calcGamma = Math.min(5.0, 3.3 * Math.pow(waveAge, -0.75));
+        calcSpread = Math.max(2, Math.min(6, Math.round(11.5 * Math.pow(waveAge, 2.5))));
+    } else if (waveAge > 1.25) {
+        calcGamma = 1.0;
+        calcSpread = Math.min(22, Math.round(11.5 * Math.pow(waveAge, 2.5)));
+    }
+
+    // Deep water visual clamp: surface wave kinematics enter the deep-water asymptotic regime (tanh(kd) = 1.0)
+    const visualDepth = Math.min(200, Math.max(8, realDepth));
+
+    document.getElementById('slider-hs').value = Math.min(14.0, Math.max(0.5, curH)).toFixed(1);
+    document.getElementById('slider-tp').value = Math.min(22.0, Math.max(4.0, curTp)).toFixed(1);
+    document.getElementById('slider-gamma').value = calcGamma.toFixed(1);
+    document.getElementById('slider-heading').value = ((curDir > 180 ? curDir - 360 : curDir)).toFixed(0);
+    document.getElementById('slider-spread').value = calcSpread;
+    document.getElementById('slider-depth').value = visualDepth.toFixed(0);
+
+    updateUI();
+
+    // Display true physical depth in telemetry
+    if (realDepth > 200) {
+        document.getElementById('val-depth').innerText = `${visualDepth.toFixed(0)} m (Pelagic: ${realDepth >= 1000 ? (realDepth / 1000).toFixed(1) + ' km' : realDepth.toFixed(0) + ' m'})`;
+    }
+
+    updateSolarLighting(cachedTimeSeries.lat, cachedTimeSeries.lon, dateObj);
+    document.getElementById('map-modal').style.display = 'none';
+});
+
+// Modal Event Listeners
+document.getElementById('btn-open-map').addEventListener('click', () => {
+    document.getElementById('map-modal').style.display = 'flex';
+    initMap();
+    setTimeout(() => { if (map) map.invalidateSize(); }, 120);
+});
+
+document.getElementById('btn-close-modal').addEventListener('click', () => {
+    document.getElementById('map-modal').style.display = 'none';
 });
